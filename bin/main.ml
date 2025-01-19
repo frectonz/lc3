@@ -17,6 +17,20 @@ module ConditionFlags = struct
   let fl_neg = to_int FL_NEG
 end
 
+module Register = struct
+  type t =
+    | R_R0
+    | R_R1
+    | R_R2
+    | R_R3
+    | R_R4
+    | R_R5
+    | R_R6
+    | R_R7
+    | R_PC
+    | R_COND
+end
+
 module Registers = struct
   type t = {
     r_r0 : uint16;
@@ -29,7 +43,6 @@ module Registers = struct
     r_r7 : uint16;
     r_pc : uint16; (* Program Counter *)
     r_cond : uint16; (* Condition Register *)
-    r_count : uint16; (* Number of registers *)
   }
 
   let make () =
@@ -46,7 +59,6 @@ module Registers = struct
       r_pc = pc_start;
       (* Condition flag shoul alway be set. *)
       r_cond = ConditionFlags.fl_pos;
-      r_count = Uint16.zero;
     }
 
   let r_pc registers = registers.r_pc
@@ -94,9 +106,12 @@ module Program = struct
     ()
 end
 
+type register_or_value = Value of uint16 | Register of Register.t
+
 type opcode =
   | OP_BR (* branch *)
-  | OP_ADD (* add *)
+  (* add *)
+  | OP_ADD of { dr : Register.t; sr1 : Register.t; sr2 : register_or_value }
   | OP_LD (* load *)
   | OP_ST (* store *)
   | OP_JSR (* jump register *)
