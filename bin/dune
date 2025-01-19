@@ -1,0 +1,4 @@
+(executable
+ (public_name lc3)
+ (name main)
+ (libraries stdint))
