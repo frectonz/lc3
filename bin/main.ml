@@ -106,26 +106,28 @@ module Program = struct
     ()
 end
 
-type register_or_value = Value of uint16 | Register of Register.t
+module OpCode = struct
+  type register_or_value = Value of uint16 | Register of Register.t
 
-type opcode =
-  | OP_BR (* branch *)
-  (* add *)
-  | OP_ADD of { dr : Register.t; sr1 : Register.t; sr2 : register_or_value }
-  | OP_LD (* load *)
-  | OP_ST (* store *)
-  | OP_JSR (* jump register *)
-  | OP_AND (* bitwise and *)
-  | OP_LDR (* load register *)
-  | OP_STR (* store register *)
-  | OP_RTI (* unused *)
-  | OP_NOT (* bitwise not *)
-  | OP_LDI (* load indirect *)
-  | OP_STI (* store indirect *)
-  | OP_JMP (* jump *)
-  | OP_RES (* reserved (unused) *)
-  | OP_LEA (* load effective address *)
-  | OP_TRAP (* execute trap *)
+  type t =
+    | OP_BR (* branch *)
+    (* add *)
+    | OP_ADD of { dr : Register.t; sr1 : Register.t; sr2 : register_or_value }
+    | OP_LD (* load *)
+    | OP_ST (* store *)
+    | OP_JSR (* jump register *)
+    | OP_AND (* bitwise and *)
+    | OP_LDR (* load register *)
+    | OP_STR (* store register *)
+    | OP_RTI (* unused *)
+    | OP_NOT (* bitwise not *)
+    | OP_LDI (* load indirect *)
+    | OP_STI (* store indirect *)
+    | OP_JMP (* jump *)
+    | OP_RES (* reserved (unused) *)
+    | OP_LEA (* load effective address *)
+    | OP_TRAP (* execute trap *)
+end
 
 let run_program path =
   match Program.make path with
