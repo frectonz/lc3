@@ -164,15 +164,17 @@ module OpCode = struct
     ; sr2 : register_or_value
     }
 
+  type op_not =
+    { dr : Register.t
+    ; sr : Register.t
+    }
+
   type op_ldi =
     { dr : Register.t
     ; pc_offset : int
     }
 
-  type op_not =
-    { dr : Register.t
-    ; sr : Register.t
-    }
+  type op_jmp = { dr : Register.t }
 
   type t =
     | OP_BR of op_br (* branch *)
@@ -187,7 +189,7 @@ module OpCode = struct
     | OP_NOT of op_not (* bitwise not *)
     | OP_LDI of op_ldi (* load indirect *)
     | OP_STI (* store indirect *)
-    | OP_JMP (* jump *)
+    | OP_JMP of op_jmp (* jump *)
     | OP_RES (* reserved (unused) *)
     | OP_LEA (* load effective address *)
     | OP_TRAP (* execute trap *)
@@ -275,6 +277,15 @@ module OpCode = struct
     if cond = 1
     then Registers.r_cond registers + pc_offset |> Registers.set registers R_PC
     else registers
+  ;;
+
+  let parse_jump instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    Ok (OP_JMP { dr })
+  ;;
+
+  let run_jump { dr } registers =
+    Registers.get dr registers |> Registers.set registers R_PC
   ;;
 end
 
