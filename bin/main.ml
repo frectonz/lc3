@@ -158,6 +158,11 @@ module OpCode = struct
     ; sr2 : register_or_value
     }
 
+  type op_ldi =
+    { dr : Register.t
+    ; pc_offset : int
+    }
+
   type t =
     | OP_BR (* branch *)
     (* add *)
@@ -170,7 +175,7 @@ module OpCode = struct
     | OP_STR (* store register *)
     | OP_RTI (* unused *)
     | OP_NOT (* bitwise not *)
-    | OP_LDI (* load indirect *)
+    | OP_LDI of op_ldi (* load indirect *)
     | OP_STI (* store indirect *)
     | OP_JMP (* jump *)
     | OP_RES (* reserved (unused) *)
@@ -203,6 +208,20 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_ldi instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let pc_offset = sign_extend (instr land 0x1F) 9 in
+    Ok (OP_LDI { dr; pc_offset })
+  ;;
+
+  let run_ldi { dr; pc_offset } registers memory =
+    Registers.r_pc registers + pc_offset
+    |> Memory.get memory
+    |> Memory.get memory
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
+  ;;
 end
 
 module Program = struct
@@ -224,6 +243,7 @@ module Program = struct
     let op = instr lsr 12 in
     match op with
     | 1 -> OpCode.parse_add instr
+    | 10 -> OpCode.parse_ldi instr
     | x -> Error (`UnknownOp x)
   ;;
 end
