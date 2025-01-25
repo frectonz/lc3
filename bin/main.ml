@@ -152,7 +152,7 @@ module OpCode = struct
     | Value of int
     | Register of Register.t
 
-  type op_add =
+  type two_operators =
     { dr : Register.t
     ; sr1 : Register.t
     ; sr2 : register_or_value
@@ -165,11 +165,11 @@ module OpCode = struct
 
   type t =
     | OP_BR (* branch *)
-    | OP_ADD of op_add (* add *)
+    | OP_ADD of two_operators (* add *)
     | OP_LD (* load *)
     | OP_ST (* store *)
     | OP_JSR (* jump register *)
-    | OP_AND (* bitwise and *)
+    | OP_AND of two_operators (* bitwise and *)
     | OP_LDR (* load register *)
     | OP_STR (* store register *)
     | OP_RTI (* unused *)
@@ -185,18 +185,20 @@ module OpCode = struct
     if (x lsr (bit_count - 1)) land 1 = 1 then x lor (0xFFFF lsl bit_count) else x
   ;;
 
-  let parse_add instr =
+  let parse_two_operators instr =
     let imm_flag = (instr lsr 5) land 1 in
     let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
     let* sr1 = (instr lsr 6) land 0x7 |> Register.of_int in
     if imm_flag == 1
     then (
       let v = sign_extend (instr land 0x1F) 5 in
-      Ok (OP_ADD { dr; sr1; sr2 = Value v }))
+      Ok { dr; sr1; sr2 = Value v })
     else
       let* r = instr land 0x7 |> Register.of_int in
-      Ok (OP_ADD { dr; sr1; sr2 = Register r })
+      Ok { dr; sr1; sr2 = Register r }
   ;;
+
+  let parse_add instr = parse_two_operators instr |> Result.map (fun x -> OP_ADD x)
 
   let run_add { dr; sr1; sr2 } registers =
     (Registers.get sr1 registers
@@ -226,6 +228,17 @@ module OpCode = struct
   let run_rti = Error `Unused
   let parse_res _ = Ok OP_RES
   let run_res = Error `Unused
+  let parse_and instr = parse_two_operators instr |> Result.map (fun x -> OP_AND x)
+
+  let run_and { dr; sr1; sr2 } registers =
+    (Registers.get sr1 registers
+     land
+     match sr2 with
+     | Value x -> x
+     | Register r -> Registers.get r registers)
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
+  ;;
 end
 
 module Program = struct
@@ -247,6 +260,7 @@ module Program = struct
     let op = instr lsr 12 in
     match op with
     | 1 -> OpCode.parse_add instr
+    | 5 -> OpCode.parse_and instr
     | 8 -> OpCode.parse_rti instr
     | 10 -> OpCode.parse_ldi instr
     | 13 -> OpCode.parse_res instr
