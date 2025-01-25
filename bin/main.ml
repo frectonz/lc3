@@ -29,6 +29,19 @@ module Register = struct
     | R_R7
     | R_PC
     | R_COND
+
+  let of_int = function
+    | 0 -> Ok R_R0
+    | 1 -> Ok R_R1
+    | 2 -> Ok R_R2
+    | 3 -> Ok R_R3
+    | 4 -> Ok R_R4
+    | 5 -> Ok R_R5
+    | 6 -> Ok R_R6
+    | 7 -> Ok R_R7
+    | 8 -> Ok R_PC
+    | 9 -> Ok R_COND
+    | r -> Error (`UnkownRegister r)
 end
 
 module Registers = struct
@@ -91,21 +104,6 @@ module Memory = struct
             Ok memory)
 end
 
-module Program = struct
-  type t = { memory : Memory.t; registers : Registers.t }
-
-  let make image_path =
-    let* memory = Memory.make image_path in
-    Ok { memory; registers = Registers.make () }
-
-  let run (program : t) = ()
-
-  let rec evolve program =
-    let registers = Registers.inc_r_pc program.registers in
-    let op = Registers.r_pc registers |> Memory.get program.memory in
-    ()
-end
-
 module OpCode = struct
   type register_or_value = Value of uint16 | Register of Register.t
 
@@ -127,6 +125,52 @@ module OpCode = struct
     | OP_RES (* reserved (unused) *)
     | OP_LEA (* load effective address *)
     | OP_TRAP (* execute trap *)
+
+  let sign_extend x bit_count =
+    let bit_count = bit_count - 1 in
+    let open Uint16 in
+    if logand (shift_right_logical x bit_count) (of_int 1) = of_int 1 then
+      logor x (shift_right_logical (of_int 0xFFFF) bit_count)
+    else x
+
+  let parse_add instr =
+    let imm_flag =
+      Uint16.(logand (shift_right_logical instr 5) (Uint16.of_int 1))
+    in
+    let* dr =
+      Uint16.(logand (shift_right_logical instr 9) (of_int 0x7))
+      |> Uint16.to_int |> Register.of_int
+    in
+    let* sr1 =
+      Uint16.(logand (shift_right_logical instr 6) (of_int 0x7))
+      |> Uint16.to_int |> Register.of_int
+    in
+    if imm_flag == Uint16.of_int 1 then
+      let v = sign_extend Uint16.(logand instr (of_int 0x1F)) 5 in
+      Ok (OP_ADD { dr; sr1; sr2 = Value v })
+    else
+      let* r =
+        Uint16.(logand instr (of_int 0x7)) |> Uint16.to_int |> Register.of_int
+      in
+      Ok (OP_ADD { dr; sr1; sr2 = Register r })
+end
+
+module Program = struct
+  type t = { memory : Memory.t; registers : Registers.t }
+
+  let make image_path =
+    let* memory = Memory.make image_path in
+    Ok { memory; registers = Registers.make () }
+
+  let run (program : t) = ()
+
+  let rec evolve program =
+    let registers = Registers.inc_r_pc program.registers in
+    let instr = Registers.r_pc registers |> Memory.get program.memory in
+    let op = Uint16.(shift_right_logical instr 12) in
+    match op |> Uint16.to_int with
+    | 1 -> OpCode.parse_add instr
+    | x -> Error (`UnknownOp x)
 end
 
 let run_program path =
