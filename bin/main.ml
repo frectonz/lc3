@@ -165,8 +165,7 @@ module OpCode = struct
 
   type t =
     | OP_BR (* branch *)
-    (* add *)
-    | OP_ADD of op_add
+    | OP_ADD of op_add (* add *)
     | OP_LD (* load *)
     | OP_ST (* store *)
     | OP_JSR (* jump register *)
@@ -222,6 +221,11 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_rti _ = Ok OP_RTI
+  let run_rti = Error `Unused
+  let parse_res _ = Ok OP_RES
+  let run_res = Error `Unused
 end
 
 module Program = struct
@@ -243,7 +247,9 @@ module Program = struct
     let op = instr lsr 12 in
     match op with
     | 1 -> OpCode.parse_add instr
+    | 8 -> OpCode.parse_rti instr
     | 10 -> OpCode.parse_ldi instr
+    | 13 -> OpCode.parse_res instr
     | x -> Error (`UnknownOp x)
   ;;
 end
