@@ -84,6 +84,7 @@ module Registers = struct
 
   let r_pc registers = registers.r_pc
   let inc_r_pc registers = { registers with r_pc = registers.r_pc + 1 }
+  let r_cond registers = registers.r_cond
 
   let get (index : Register.t) registers =
     match index with
@@ -148,6 +149,11 @@ module Memory = struct
 end
 
 module OpCode = struct
+  type op_br =
+    { pc_offset : int
+    ; cond_flag : int
+    }
+
   type register_or_value =
     | Value of int
     | Register of Register.t
@@ -169,7 +175,7 @@ module OpCode = struct
     }
 
   type t =
-    | OP_BR (* branch *)
+    | OP_BR of op_br (* branch *)
     | OP_ADD of two_operators (* add *)
     | OP_LD (* load *)
     | OP_ST (* store *)
@@ -256,6 +262,19 @@ module OpCode = struct
     |> lnot
     |> Registers.set registers dr
     |> Registers.update_flags dr
+  ;;
+
+  let parse_branch instr =
+    let pc_offset = sign_extend (instr land 0x1F) 9 in
+    let cond_flag = (instr lsr 9) land 0x7 in
+    Ok (OP_BR { pc_offset; cond_flag })
+  ;;
+
+  let run_branch { pc_offset; cond_flag } registers =
+    let cond = cond_flag land Registers.r_cond registers in
+    if cond = 1
+    then Registers.r_cond registers + pc_offset |> Registers.set registers R_PC
+    else registers
   ;;
 end
 
