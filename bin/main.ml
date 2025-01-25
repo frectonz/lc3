@@ -307,11 +307,13 @@ module Program = struct
     let instr = Registers.r_pc registers |> Memory.get program.memory in
     let op = instr lsr 12 in
     match op with
+    | 0 -> OpCode.parse_branch instr
     | 1 -> OpCode.parse_add instr
     | 5 -> OpCode.parse_and instr
     | 8 -> OpCode.parse_rti instr
     | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
+    | 12 -> OpCode.parse_jump instr
     | 13 -> OpCode.parse_res instr
     | x -> Error (`UnknownOp x)
   ;;
