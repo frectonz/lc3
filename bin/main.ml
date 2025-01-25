@@ -163,6 +163,11 @@ module OpCode = struct
     ; pc_offset : int
     }
 
+  type op_not =
+    { dr : Register.t
+    ; sr : Register.t
+    }
+
   type t =
     | OP_BR (* branch *)
     | OP_ADD of two_operators (* add *)
@@ -173,7 +178,7 @@ module OpCode = struct
     | OP_LDR (* load register *)
     | OP_STR (* store register *)
     | OP_RTI (* unused *)
-    | OP_NOT (* bitwise not *)
+    | OP_NOT of op_not (* bitwise not *)
     | OP_LDI of op_ldi (* load indirect *)
     | OP_STI (* store indirect *)
     | OP_JMP (* jump *)
@@ -239,6 +244,19 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_not instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    Ok (OP_NOT { dr; sr })
+  ;;
+
+  let run_not { dr; sr } registers =
+    Registers.get sr registers
+    |> lnot
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
+  ;;
 end
 
 module Program = struct
@@ -262,6 +280,7 @@ module Program = struct
     | 1 -> OpCode.parse_add instr
     | 5 -> OpCode.parse_and instr
     | 8 -> OpCode.parse_rti instr
+    | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
     | 13 -> OpCode.parse_res instr
     | x -> Error (`UnknownOp x)
