@@ -84,6 +84,42 @@ module Registers = struct
 
   let r_pc registers = registers.r_pc
   let inc_r_pc registers = { registers with r_pc = registers.r_pc + 1 }
+
+  let get (index : Register.t) registers =
+    match index with
+    | R_R0 -> registers.r_r0
+    | R_R1 -> registers.r_r1
+    | R_R2 -> registers.r_r2
+    | R_R3 -> registers.r_r3
+    | R_R4 -> registers.r_r4
+    | R_R5 -> registers.r_r5
+    | R_R6 -> registers.r_r6
+    | R_R7 -> registers.r_r7
+    | R_PC -> registers.r_pc
+    | R_COND -> registers.r_cond
+  ;;
+
+  let set (registers : t) (index : Register.t) value =
+    match index with
+    | R_R0 -> { registers with r_r0 = value }
+    | R_R1 -> { registers with r_r1 = value }
+    | R_R2 -> { registers with r_r2 = value }
+    | R_R3 -> { registers with r_r3 = value }
+    | R_R4 -> { registers with r_r4 = value }
+    | R_R5 -> { registers with r_r5 = value }
+    | R_R6 -> { registers with r_r6 = value }
+    | R_R7 -> { registers with r_r7 = value }
+    | R_PC -> { registers with r_pc = value }
+    | R_COND -> { registers with r_cond = value }
+  ;;
+
+  let update_flags (index : Register.t) (registers : t) =
+    if get index registers == 0
+    then set registers R_COND ConditionFlags.fl_zro
+    else if get index registers lsr 15 == 1
+    then set registers R_COND ConditionFlags.fl_neg
+    else set registers R_COND ConditionFlags.fl_pos
+  ;;
 end
 
 module Memory = struct
@@ -116,14 +152,16 @@ module OpCode = struct
     | Value of int
     | Register of Register.t
 
+  type op_add =
+    { dr : Register.t
+    ; sr1 : Register.t
+    ; sr2 : register_or_value
+    }
+
   type t =
     | OP_BR (* branch *)
     (* add *)
-    | OP_ADD of
-        { dr : Register.t
-        ; sr1 : Register.t
-        ; sr2 : register_or_value
-        }
+    | OP_ADD of op_add
     | OP_LD (* load *)
     | OP_ST (* store *)
     | OP_JSR (* jump register *)
@@ -154,6 +192,16 @@ module OpCode = struct
     else
       let* r = instr land 0x7 |> Register.of_int in
       Ok (OP_ADD { dr; sr1; sr2 = Register r })
+  ;;
+
+  let run_add { dr; sr1; sr2 } registers =
+    (Registers.get sr1 registers
+     +
+     match sr2 with
+     | Value x -> x
+     | Register r -> Registers.get r registers)
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
   ;;
 end
 
