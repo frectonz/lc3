@@ -2,15 +2,7 @@
 [@@@warning "-unused-rec-flag"]
 [@@@warning "-unused-var-strict"]
 
-module Array = struct
-  include Array
-
-  let remove_first arr =
-    if Array.length arr = 0 then
-      [||] (* Return an empty array if the input is empty *)
-    else
-      Array.sub arr 1 (Array.length arr - 1)
-end
+open Array_ext
 
 let memory_max = 1 lsl 16
 let pc_start = 0x3000 (* Program counter starting address. *)
