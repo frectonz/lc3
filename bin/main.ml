@@ -3,15 +3,10 @@
 [@@@warning "-unused-var-strict"]
 
 open Array_ext
+open Utils
 
 let memory_max = 1 lsl 16
 let pc_start = 0x3000 (* Program counter starting address. *)
-
-let ( let* ) x f =
-  match x with
-  | Ok v -> f v
-  | Error e -> Error e
-;;
 
 module Memory = struct
   type t = int array
