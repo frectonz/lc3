@@ -7,6 +7,32 @@ let ( let* ) x f =
   | Error e -> Error e
 ;;
 
+module Memory = struct
+  type t = int array
+
+  let empty () = Array.make memory_max 0
+  let get memory pos = Array.get memory pos
+  let set memory pos value = Array.set memory pos value
+
+  let make image_path =
+    let memory = empty () in
+    In_channel.with_open_bin image_path (fun ic ->
+      let buf = Bytes.create 2 in
+      match In_channel.really_input ic buf 0 2 with
+      | None -> Error `FailedToReadImage
+      | Some () ->
+        let origin = Bytes.get_uint16_be buf 0 in
+        let max_read = memory_max - origin in
+        let buf = Bytes.create max_read in
+        let read = In_channel.input ic buf 0 max_read in
+        for pos = 0 to read / 2 do
+          let n = Bytes.get_uint16_be buf (pos * 2) in
+          memory.(origin + pos) <- n
+        done;
+        Ok memory)
+  ;;
+end
+
 module ConditionFlags = struct
   type t =
     | FL_POS
@@ -22,42 +48,6 @@ module ConditionFlags = struct
   let fl_pos = to_int FL_POS
   let fl_zro = to_int FL_ZRO
   let fl_neg = to_int FL_NEG
-end
-
-module Trap = struct
-  type t =
-    | TRAP_GETC
-    | TRAP_OUT
-    | TRAP_PUTS
-    | TRAP_IN
-    | TRAP_PUTSP
-    | TRAP_HALT
-
-  let to_int = function
-    | TRAP_GETC -> 0x20
-    | TRAP_OUT -> 0x21
-    | TRAP_PUTS -> 0x22
-    | TRAP_IN -> 0x23
-    | TRAP_PUTSP -> 0x24
-    | TRAP_HALT -> 0x25
-  ;;
-
-  let of_int = function
-    | 0x20 -> Ok TRAP_GETC
-    | 0x21 -> Ok TRAP_OUT
-    | 0x22 -> Ok TRAP_PUTS
-    | 0x23 -> Ok TRAP_IN
-    | 0x24 -> Ok TRAP_PUTSP
-    | 0x25 -> Ok TRAP_HALT
-    | x -> Error (`UnknownTrap x)
-  ;;
-
-  let trap_getc = to_int TRAP_GETC
-  let trap_out = to_int TRAP_OUT
-  let trap_puts = to_int TRAP_PUTS
-  let trap_in = to_int TRAP_IN
-  let trap_putsp = to_int TRAP_PUTSP
-  let trap_halt = to_int TRAP_HALT
 end
 
 module Register = struct
@@ -159,29 +149,98 @@ module Registers = struct
   ;;
 end
 
-module Memory = struct
-  type t = int array
+module Trap = struct
+  type t =
+    | TRAP_GETC
+    | TRAP_OUT
+    | TRAP_PUTS
+    | TRAP_IN
+    | TRAP_PUTSP
+    | TRAP_HALT
 
-  let empty () = Array.make memory_max 0
-  let get memory pos = Array.get memory pos
-  let set memory pos value = Array.set memory pos value
+  let to_int = function
+    | TRAP_GETC -> 0x20
+    | TRAP_OUT -> 0x21
+    | TRAP_PUTS -> 0x22
+    | TRAP_IN -> 0x23
+    | TRAP_PUTSP -> 0x24
+    | TRAP_HALT -> 0x25
+  ;;
 
-  let make image_path =
-    let memory = empty () in
-    In_channel.with_open_bin image_path (fun ic ->
-      let buf = Bytes.create 2 in
-      match In_channel.really_input ic buf 0 2 with
-      | None -> Error `FailedToReadImage
-      | Some () ->
-        let origin = Bytes.get_uint16_be buf 0 in
-        let max_read = memory_max - origin in
-        let buf = Bytes.create max_read in
-        let read = In_channel.input ic buf 0 max_read in
-        for pos = 0 to read / 2 do
-          let n = Bytes.get_uint16_be buf (pos * 2) in
-          memory.(origin + pos) <- n
-        done;
-        Ok memory)
+  let of_int = function
+    | 0x20 -> Ok TRAP_GETC
+    | 0x21 -> Ok TRAP_OUT
+    | 0x22 -> Ok TRAP_PUTS
+    | 0x23 -> Ok TRAP_IN
+    | 0x24 -> Ok TRAP_PUTSP
+    | 0x25 -> Ok TRAP_HALT
+    | x -> Error (`UnknownTrap x)
+  ;;
+
+  let trap_getc = to_int TRAP_GETC
+  let trap_out = to_int TRAP_OUT
+  let trap_puts = to_int TRAP_PUTS
+  let trap_in = to_int TRAP_IN
+  let trap_putsp = to_int TRAP_PUTSP
+  let trap_halt = to_int TRAP_HALT
+
+  let exec_trap_getc registers =
+    Registers.set registers R_R0 (input_char stdin |> int_of_char)
+    |> Registers.update_flags R_R0
+  ;;
+
+  let exec_trap_puts memory registers =
+    let rec aux i =
+      let c = Memory.get memory (Registers.get R_R0 registers + i) in
+      if c = 0
+      then ()
+      else (
+        output_char stdout (char_of_int c);
+        aux (i + 1))
+    in
+    aux 0;
+    flush stdout
+  ;;
+
+  let exec_trap_out registers =
+    Registers.get R_R0 registers |> char_of_int |> output_char stdout;
+    flush stdout
+  ;;
+
+  let exec_trap_in registers =
+    print_string "Enter a character: ";
+    flush stdout;
+    let c = input_char stdin in
+    output_char stdout c;
+    flush stdout;
+    Registers.set registers R_R0 (int_of_char c) |> Registers.update_flags R_R0
+  ;;
+
+  let exec_trap_putsp memory registers =
+    let rec aux i =
+      let c = Memory.get memory (Registers.get R_R0 registers + i) in
+      if c = 0
+      then ()
+      else (
+        let char1 = c land 0xFF in
+        if char1 = 0
+        then ()
+        else (
+          output_char stdout (char_of_int char1);
+          let char2 = c lsl 8 in
+          if char2 = 0
+          then ()
+          else (
+            output_char stdout (char_of_int char2);
+            aux (i + 1))))
+    in
+    aux 0;
+    flush stdout
+  ;;
+
+  let exec_trap_halt () =
+    print_endline "HALT";
+    flush stdout
   ;;
 end
 
