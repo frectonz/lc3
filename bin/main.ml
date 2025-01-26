@@ -11,7 +11,26 @@ module Memory = struct
   type t = int array
 
   let empty () = Array.make memory_max 0
-  let get memory pos = Array.get memory pos
+  let mr_kbsr = 0xFE00
+  let mr_kbdr = 0xFE02
+
+  let check_key () =
+    match Unix.select [ Unix.stdin ] [] [] 0. with
+    | [], _, _ -> false
+    | _ :: _, _, _ -> true
+  ;;
+
+  let get memory pos =
+    if pos = mr_kbsr
+    then
+      if check_key ()
+      then (
+        memory.(mr_kbsr) <- 1 lsl 15;
+        memory.(mr_kbdr) <- input_char stdin |> int_of_char)
+      else memory.(mr_kbsr) <- 0;
+    Array.get memory pos
+  ;;
+
   let set memory pos value = Array.set memory pos value
 
   let make image_path =
