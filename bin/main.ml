@@ -171,7 +171,7 @@ module OpCode = struct
     ; sr : Register.t
     }
 
-  type op_ldi =
+  type load_register =
     { dr : Register.t
     ; pc_offset : int
     }
@@ -181,7 +181,7 @@ module OpCode = struct
   type t =
     | OP_BR of op_br (* branch *)
     | OP_ADD of two_operators (* add *)
-    | OP_LD (* load *)
+    | OP_LD of load_register (* load *)
     | OP_ST (* store *)
     | OP_JSR of op_jsr (* jump register *)
     | OP_AND of two_operators (* bitwise and *)
@@ -189,7 +189,7 @@ module OpCode = struct
     | OP_STR (* store register *)
     | OP_RTI (* unused *)
     | OP_NOT of op_not (* bitwise not *)
-    | OP_LDI of op_ldi (* load indirect *)
+    | OP_LDI of load_register (* load indirect *)
     | OP_STI (* store indirect *)
     | OP_JMP of op_jmp (* jump *)
     | OP_RES (* reserved (unused) *)
@@ -301,7 +301,7 @@ module OpCode = struct
       Ok (OP_JSR { sr = Register r })
   ;;
 
-  let run_jsr ({ sr }: op_jsr) registers =
+  let run_jsr ({ sr } : op_jsr) registers =
     Registers.r_pc registers
     |> Registers.set registers R_R7
     |>
@@ -310,6 +310,19 @@ module OpCode = struct
       fun registers -> Registers.set registers R_PC (Registers.r_pc registers + v)
     | Register r ->
       fun registers -> Registers.set registers R_PC (Registers.get r registers)
+  ;;
+
+  let parse_ld instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let pc_offset = sign_extend (instr land 0x1FF) 9 in
+    Ok (OP_LD { dr; pc_offset })
+  ;;
+
+  let run_ld { dr; pc_offset } registers memory =
+    Registers.r_pc registers + pc_offset
+    |> Memory.get memory
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
   ;;
 end
 
@@ -333,6 +346,7 @@ module Program = struct
     match op with
     | 0 -> OpCode.parse_br instr
     | 1 -> OpCode.parse_add instr
+    | 2 -> OpCode.parse_ld instr
     | 4 -> OpCode.parse_jsr instr
     | 5 -> OpCode.parse_and instr
     | 8 -> OpCode.parse_rti instr
