@@ -1,3 +1,17 @@
+[@@@warning "-unused-value-declaration"]
+[@@@warning "-unused-rec-flag"]
+[@@@warning "-unused-var-strict"]
+
+module Array = struct
+  include Array
+
+  let remove_first arr =
+    if Array.length arr = 0 then
+      [||] (* Return an empty array if the input is empty *)
+    else
+      Array.sub arr 1 (Array.length arr - 1)
+end
+
 let memory_max = 1 lsl 16
 let pc_start = 0x3000 (* Program counter starting address. *)
 
@@ -557,7 +571,7 @@ let run_program path =
 let run_programs paths = Array.iter run_program paths
 
 let () =
-  if Array.length Sys.argv < 1
-  then print_endline "lc3 [image-file1] ..."
-  else run_programs Sys.argv
+  if Array.length Sys.argv >= 2 then
+    Sys.argv |> Array.remove_first |> run_programs
+  else print_endline "lc3 [image-file1] ..."
 ;;
