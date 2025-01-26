@@ -4,6 +4,7 @@
 
 open Array_ext
 open Utils
+open Condition_flags
 
 let memory_max = 1 lsl 16
 let pc_start = 0x3000 (* Program counter starting address. *)
@@ -51,23 +52,6 @@ module Memory = struct
         done;
         Ok memory)
   ;;
-end
-
-module ConditionFlags = struct
-  type t =
-    | FL_POS
-    | FL_ZRO
-    | FL_NEG
-
-  let to_int = function
-    | FL_POS -> 1 lsl 0
-    | FL_ZRO -> 1 lsl 1
-    | FL_NEG -> 1 lsl 2
-  ;;
-
-  let fl_pos = to_int FL_POS
-  let fl_zro = to_int FL_ZRO
-  let fl_neg = to_int FL_NEG
 end
 
 module Register = struct
