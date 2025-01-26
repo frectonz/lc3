@@ -164,6 +164,8 @@ module OpCode = struct
     ; sr2 : register_or_value
     }
 
+  type op_jsr = { sr : register_or_value }
+
   type op_not =
     { dr : Register.t
     ; sr : Register.t
@@ -181,7 +183,7 @@ module OpCode = struct
     | OP_ADD of two_operators (* add *)
     | OP_LD (* load *)
     | OP_ST (* store *)
-    | OP_JSR (* jump register *)
+    | OP_JSR of op_jsr (* jump register *)
     | OP_AND of two_operators (* bitwise and *)
     | OP_LDR (* load register *)
     | OP_STR (* store register *)
@@ -266,26 +268,48 @@ module OpCode = struct
     |> Registers.update_flags dr
   ;;
 
-  let parse_branch instr =
+  let parse_br instr =
     let pc_offset = sign_extend (instr land 0x1F) 9 in
     let cond_flag = (instr lsr 9) land 0x7 in
     Ok (OP_BR { pc_offset; cond_flag })
   ;;
 
-  let run_branch { pc_offset; cond_flag } registers =
+  let run_br { pc_offset; cond_flag } registers =
     let cond = cond_flag land Registers.r_cond registers in
     if cond = 1
     then Registers.r_cond registers + pc_offset |> Registers.set registers R_PC
     else registers
   ;;
 
-  let parse_jump instr =
+  let parse_jmp instr =
     let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
     Ok (OP_JMP { dr })
   ;;
 
-  let run_jump { dr } registers =
+  let run_jmp { dr } registers =
     Registers.get dr registers |> Registers.set registers R_PC
+  ;;
+
+  let parse_jsr instr =
+    let long_flag = (instr lsr 11) land 1 in
+    if long_flag == 1
+    then (
+      let long_pc_offset = sign_extend (instr land 0x7FF) 11 in
+      Ok (OP_JSR { sr = Value long_pc_offset }))
+    else
+      let* r = instr land 0x7 |> Register.of_int in
+      Ok (OP_JSR { sr = Register r })
+  ;;
+
+  let run_jsr ({ sr }: op_jsr) registers =
+    Registers.r_pc registers
+    |> Registers.set registers R_R7
+    |>
+    match sr with
+    | Value v ->
+      fun registers -> Registers.set registers R_PC (Registers.r_pc registers + v)
+    | Register r ->
+      fun registers -> Registers.set registers R_PC (Registers.get r registers)
   ;;
 end
 
@@ -307,13 +331,14 @@ module Program = struct
     let instr = Registers.r_pc registers |> Memory.get program.memory in
     let op = instr lsr 12 in
     match op with
-    | 0 -> OpCode.parse_branch instr
+    | 0 -> OpCode.parse_br instr
     | 1 -> OpCode.parse_add instr
+    | 4 -> OpCode.parse_jsr instr
     | 5 -> OpCode.parse_and instr
     | 8 -> OpCode.parse_rti instr
     | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
-    | 12 -> OpCode.parse_jump instr
+    | 12 -> OpCode.parse_jmp instr
     | 13 -> OpCode.parse_res instr
     | x -> Error (`UnknownOp x)
   ;;
