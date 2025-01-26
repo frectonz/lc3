@@ -166,6 +166,12 @@ module OpCode = struct
 
   type op_jsr = { sr : register_or_value }
 
+  type op_ldr =
+    { dr : Register.t
+    ; sr : Register.t
+    ; offset : int
+    }
+
   type op_not =
     { dr : Register.t
     ; sr : Register.t
@@ -185,7 +191,7 @@ module OpCode = struct
     | OP_ST (* store *)
     | OP_JSR of op_jsr (* jump register *)
     | OP_AND of two_operators (* bitwise and *)
-    | OP_LDR (* load register *)
+    | OP_LDR of op_ldr (* load register *)
     | OP_STR (* store register *)
     | OP_RTI (* unused *)
     | OP_NOT of op_not (* bitwise not *)
@@ -324,6 +330,20 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_ldr instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    let offset = sign_extend (instr land 0x3F) 6 in
+    Ok (OP_LDR { dr; sr; offset })
+  ;;
+
+  let run_ldr { dr; sr; offset } registers memory =
+    Registers.get sr registers + offset
+    |> Memory.get memory
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
+  ;;
 end
 
 module Program = struct
@@ -349,6 +369,7 @@ module Program = struct
     | 2 -> OpCode.parse_ld instr
     | 4 -> OpCode.parse_jsr instr
     | 5 -> OpCode.parse_and instr
+    | 6 -> OpCode.parse_ldr instr
     | 8 -> OpCode.parse_rti instr
     | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
