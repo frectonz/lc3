@@ -193,7 +193,7 @@ module OpCode = struct
     | OP_JSR of op_jsr (* jump register *)
     | OP_AND of two_operators (* bitwise and *)
     | OP_LDR of op_ldr (* load register *)
-    | OP_STR (* store register *)
+    | OP_STR of op_ldr (* store register *)
     | OP_RTI (* unused *)
     | OP_NOT of op_not (* bitwise not *)
     | OP_LDI of load_register (* load indirect *)
@@ -381,6 +381,17 @@ module OpCode = struct
       (Registers.r_pc registers + pc_offset |> Memory.get memory)
       (Registers.get dr registers)
   ;;
+
+  let parse_str instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    let offset = sign_extend (instr land 0x3F) 6 in
+    Ok (OP_STR { dr; sr; offset })
+  ;;
+
+  let run_str { dr; sr; offset } registers memory =
+    Memory.set memory (Registers.get sr registers + offset) (Registers.get dr registers)
+  ;;
 end
 
 module Program = struct
@@ -408,6 +419,7 @@ module Program = struct
     | 4 -> OpCode.parse_jsr instr
     | 5 -> OpCode.parse_and instr
     | 6 -> OpCode.parse_ldr instr
+    | 7 -> OpCode.parse_str instr
     | 8 -> OpCode.parse_rti instr
     | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
