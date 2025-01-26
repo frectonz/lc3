@@ -128,6 +128,7 @@ module Memory = struct
 
   let empty () = Array.make memory_max 0
   let get memory pos = Array.get memory pos
+  let set memory pos value = Array.set memory pos value
 
   let make image_path =
     let memory = empty () in
@@ -188,7 +189,7 @@ module OpCode = struct
     | OP_BR of op_br (* branch *)
     | OP_ADD of two_operators (* add *)
     | OP_LD of load_register (* load *)
-    | OP_ST (* store *)
+    | OP_ST of load_register (* store *)
     | OP_JSR of op_jsr (* jump register *)
     | OP_AND of two_operators (* bitwise and *)
     | OP_LDR of op_ldr (* load register *)
@@ -357,6 +358,16 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_st instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let pc_offset = sign_extend (instr land 0x3F) 9 in
+    Ok (OP_ST { dr; pc_offset })
+  ;;
+
+  let run_st { dr; pc_offset } registers memory =
+    Memory.set memory (Registers.r_pc registers + pc_offset) (Registers.get dr registers)
+  ;;
 end
 
 module Program = struct
@@ -380,6 +391,7 @@ module Program = struct
     | 0 -> OpCode.parse_br instr
     | 1 -> OpCode.parse_add instr
     | 2 -> OpCode.parse_ld instr
+    | 3 -> OpCode.parse_st instr
     | 4 -> OpCode.parse_jsr instr
     | 5 -> OpCode.parse_and instr
     | 6 -> OpCode.parse_ldr instr
