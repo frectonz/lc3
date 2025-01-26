@@ -199,7 +199,7 @@ module OpCode = struct
     | OP_STI (* store indirect *)
     | OP_JMP of op_jmp (* jump *)
     | OP_RES (* reserved (unused) *)
-    | OP_LEA (* load effective address *)
+    | OP_LEA of load_register (* load effective address *)
     | OP_TRAP (* execute trap *)
 
   let sign_extend x bit_count =
@@ -344,6 +344,19 @@ module OpCode = struct
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
+
+  let parse_lea instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let pc_offset = sign_extend (instr land 0x3F) 9 in
+    Ok (OP_LEA { dr; pc_offset })
+  ;;
+
+  let run_lea { dr; pc_offset } registers memory =
+    Registers.r_pc registers + pc_offset
+    |> Memory.get memory
+    |> Registers.set registers dr
+    |> Registers.update_flags dr
+  ;;
 end
 
 module Program = struct
@@ -375,6 +388,7 @@ module Program = struct
     | 10 -> OpCode.parse_ldi instr
     | 12 -> OpCode.parse_jmp instr
     | 13 -> OpCode.parse_res instr
+    | 14 -> OpCode.parse_lea instr
     | x -> Error (`UnknownOp x)
   ;;
 end
