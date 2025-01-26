@@ -24,6 +24,42 @@ module ConditionFlags = struct
   let fl_neg = to_int FL_NEG
 end
 
+module Trap = struct
+  type t =
+    | TRAP_GETC
+    | TRAP_OUT
+    | TRAP_PUTS
+    | TRAP_IN
+    | TRAP_PUTSP
+    | TRAP_HALT
+
+  let to_int = function
+    | TRAP_GETC -> 0x20
+    | TRAP_OUT -> 0x21
+    | TRAP_PUTS -> 0x22
+    | TRAP_IN -> 0x23
+    | TRAP_PUTSP -> 0x24
+    | TRAP_HALT -> 0x25
+  ;;
+
+  let of_int = function
+    | 0x20 -> Ok TRAP_GETC
+    | 0x21 -> Ok TRAP_OUT
+    | 0x22 -> Ok TRAP_PUTS
+    | 0x23 -> Ok TRAP_IN
+    | 0x24 -> Ok TRAP_PUTSP
+    | 0x25 -> Ok TRAP_HALT
+    | x -> Error (`UnknownTrap x)
+  ;;
+
+  let trap_getc = to_int TRAP_GETC
+  let trap_out = to_int TRAP_OUT
+  let trap_puts = to_int TRAP_PUTS
+  let trap_in = to_int TRAP_IN
+  let trap_putsp = to_int TRAP_PUTSP
+  let trap_halt = to_int TRAP_HALT
+end
+
 module Register = struct
   type t =
     | R_R0
@@ -199,9 +235,9 @@ module OpCode = struct
     | OP_LDI of load_register (* load indirect *)
     | OP_STI of load_register (* store indirect *)
     | OP_JMP of op_jmp (* jump *)
-    | OP_RES (* reserved (unused) *)
+    | OP_RES (* unused *)
     | OP_LEA of load_register (* load effective address *)
-    | OP_TRAP (* execute trap *)
+    | OP_TRAP of Trap.t (* execute trap *)
 
   let sign_extend x bit_count =
     if (x lsr (bit_count - 1)) land 1 = 1 then x lor (0xFFFF lsl bit_count) else x
@@ -392,6 +428,8 @@ module OpCode = struct
   let run_str { dr; sr; offset } registers memory =
     Memory.set memory (Registers.get sr registers + offset) (Registers.get dr registers)
   ;;
+
+  let parse_trap instr = Trap.of_int (instr land 0xFF) |> Result.map (fun t -> OP_TRAP t)
 end
 
 module Program = struct
@@ -427,6 +465,7 @@ module Program = struct
     | 12 -> OpCode.parse_jmp instr
     | 13 -> OpCode.parse_res instr
     | 14 -> OpCode.parse_lea instr
+    | 15 -> OpCode.parse_trap instr
     | x -> Error (`UnknownOp x)
   ;;
 end
