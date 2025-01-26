@@ -197,7 +197,7 @@ module OpCode = struct
     | OP_RTI (* unused *)
     | OP_NOT of op_not (* bitwise not *)
     | OP_LDI of load_register (* load indirect *)
-    | OP_STI (* store indirect *)
+    | OP_STI of load_register (* store indirect *)
     | OP_JMP of op_jmp (* jump *)
     | OP_RES (* reserved (unused) *)
     | OP_LEA of load_register (* load effective address *)
@@ -368,6 +368,19 @@ module OpCode = struct
   let run_st { dr; pc_offset } registers memory =
     Memory.set memory (Registers.r_pc registers + pc_offset) (Registers.get dr registers)
   ;;
+
+  let parse_sti instr =
+    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let pc_offset = sign_extend (instr land 0x3F) 9 in
+    Ok (OP_STI { dr; pc_offset })
+  ;;
+
+  let run_sti { dr; pc_offset } registers memory =
+    Memory.set
+      memory
+      (Registers.r_pc registers + pc_offset |> Memory.get memory)
+      (Registers.get dr registers)
+  ;;
 end
 
 module Program = struct
@@ -398,6 +411,7 @@ module Program = struct
     | 8 -> OpCode.parse_rti instr
     | 9 -> OpCode.parse_not instr
     | 10 -> OpCode.parse_ldi instr
+    | 11 -> OpCode.parse_sti instr
     | 12 -> OpCode.parse_jmp instr
     | 13 -> OpCode.parse_res instr
     | 14 -> OpCode.parse_lea instr
