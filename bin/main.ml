@@ -4,11 +4,9 @@
 
 open Array_ext
 open Utils
-open Register
 open Registers
 
 let memory_max = 1 lsl 16
-let pc_start = 0x3000 (* Program counter starting address. *)
 
 module Memory = struct
   type t = int array
@@ -158,33 +156,33 @@ module OpCode = struct
 
   type register_or_value =
     | Value of int
-    | Register of Register.t
+    | Register of Registers.register
 
   type two_operators =
-    { dr : Register.t
-    ; sr1 : Register.t
+    { dr : Registers.register
+    ; sr1 : Registers.register
     ; sr2 : register_or_value
     }
 
   type op_jsr = { sr : register_or_value }
 
   type op_ldr =
-    { dr : Register.t
-    ; sr : Register.t
+    { dr : Registers.register
+    ; sr : Registers.register
     ; offset : int
     }
 
   type op_not =
-    { dr : Register.t
-    ; sr : Register.t
+    { dr : Registers.register
+    ; sr : Registers.register
     }
 
   type load_register =
-    { dr : Register.t
+    { dr : Registers.register
     ; pc_offset : int
     }
 
-  type op_jmp = { dr : Register.t }
+  type op_jmp = { dr : Registers.register }
 
   type t =
     | OP_BR of op_br (* branch *)
@@ -210,14 +208,14 @@ module OpCode = struct
 
   let parse_two_operators instr =
     let imm_flag = (instr lsr 5) land 1 in
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
-    let* sr1 = (instr lsr 6) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
+    let* sr1 = (instr lsr 6) land 0x7 |> Registers.register_of_int in
     if imm_flag == 1
     then (
       let v = sign_extend (instr land 0x1F) 5 in
       Ok { dr; sr1; sr2 = Value v })
     else
-      let* r = instr land 0x7 |> Register.of_int in
+      let* r = instr land 0x7 |> Registers.register_of_int in
       Ok { dr; sr1; sr2 = Register r }
   ;;
 
@@ -234,7 +232,7 @@ module OpCode = struct
   ;;
 
   let parse_ldi instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     let pc_offset = sign_extend (instr land 0x1F) 9 in
     Ok (OP_LDI { dr; pc_offset })
   ;;
@@ -264,8 +262,8 @@ module OpCode = struct
   ;;
 
   let parse_not instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
-    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Registers.register_of_int in
     Ok (OP_NOT { dr; sr })
   ;;
 
@@ -290,7 +288,7 @@ module OpCode = struct
   ;;
 
   let parse_jmp instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     Ok (OP_JMP { dr })
   ;;
 
@@ -305,7 +303,7 @@ module OpCode = struct
       let long_pc_offset = sign_extend (instr land 0x7FF) 11 in
       Ok (OP_JSR { sr = Value long_pc_offset }))
     else
-      let* r = instr land 0x7 |> Register.of_int in
+      let* r = instr land 0x7 |> Registers.register_of_int in
       Ok (OP_JSR { sr = Register r })
   ;;
 
@@ -321,7 +319,7 @@ module OpCode = struct
   ;;
 
   let parse_ld instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     let pc_offset = sign_extend (instr land 0x1FF) 9 in
     Ok (OP_LD { dr; pc_offset })
   ;;
@@ -334,8 +332,8 @@ module OpCode = struct
   ;;
 
   let parse_ldr instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
-    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Registers.register_of_int in
     let offset = sign_extend (instr land 0x3F) 6 in
     Ok (OP_LDR { dr; sr; offset })
   ;;
@@ -348,7 +346,7 @@ module OpCode = struct
   ;;
 
   let parse_lea instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     let pc_offset = sign_extend (instr land 0x3F) 9 in
     Ok (OP_LEA { dr; pc_offset })
   ;;
@@ -361,7 +359,7 @@ module OpCode = struct
   ;;
 
   let parse_st instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     let pc_offset = sign_extend (instr land 0x3F) 9 in
     Ok (OP_ST { dr; pc_offset })
   ;;
@@ -371,7 +369,7 @@ module OpCode = struct
   ;;
 
   let parse_sti instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
     let pc_offset = sign_extend (instr land 0x3F) 9 in
     Ok (OP_STI { dr; pc_offset })
   ;;
@@ -384,8 +382,8 @@ module OpCode = struct
   ;;
 
   let parse_str instr =
-    let* dr = (instr lsr 9) land 0x7 |> Register.of_int in
-    let* sr = (instr lsr 6) land 0x7 |> Register.of_int in
+    let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
+    let* sr = (instr lsr 6) land 0x7 |> Registers.register_of_int in
     let offset = sign_extend (instr land 0x3F) 6 in
     Ok (OP_STR { dr; sr; offset })
   ;;
@@ -444,7 +442,7 @@ let run_program path =
 let run_programs paths = Array.iter run_program paths
 
 let () =
-  if Array.length Sys.argv >= 2 then
-    Sys.argv |> Array.remove_first |> run_programs
+  if Array.length Sys.argv >= 2
+  then Sys.argv |> Array.remove_first |> run_programs
   else print_endline "lc3 [image-file1] ..."
 ;;

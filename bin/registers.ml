@@ -1,4 +1,3 @@
-open Register
 open Condition_flags
 
 let pc_start = 0x3000 (* Program counter starting address. *)
@@ -17,6 +16,32 @@ module Registers = struct
     ; r_cond : int (* Condition Register *)
     }
 
+  type register =
+    | R_R0
+    | R_R1
+    | R_R2
+    | R_R3
+    | R_R4
+    | R_R5
+    | R_R6
+    | R_R7
+    | R_PC
+    | R_COND
+
+  let register_of_int = function
+    | 0 -> Ok R_R0
+    | 1 -> Ok R_R1
+    | 2 -> Ok R_R2
+    | 3 -> Ok R_R3
+    | 4 -> Ok R_R4
+    | 5 -> Ok R_R5
+    | 6 -> Ok R_R6
+    | 7 -> Ok R_R7
+    | 8 -> Ok R_PC
+    | 9 -> Ok R_COND
+    | r -> Error (`UnkownRegister r)
+  ;;
+
   let make () =
     { r_r0 = 0
     ; r_r1 = 0
@@ -33,11 +58,9 @@ module Registers = struct
     }
   ;;
 
-  let r_pc registers = registers.r_pc
   let inc_r_pc registers = { registers with r_pc = registers.r_pc + 1 }
-  let r_cond registers = registers.r_cond
 
-  let get (index : Register.t) registers =
+  let get index registers =
     match index with
     | R_R0 -> registers.r_r0
     | R_R1 -> registers.r_r1
@@ -51,7 +74,7 @@ module Registers = struct
     | R_COND -> registers.r_cond
   ;;
 
-  let set (registers : t) (index : Register.t) value =
+  let set registers index value =
     match index with
     | R_R0 -> { registers with r_r0 = value }
     | R_R1 -> { registers with r_r1 = value }
@@ -65,11 +88,22 @@ module Registers = struct
     | R_COND -> { registers with r_cond = value }
   ;;
 
-  let update_flags (index : Register.t) (registers : t) =
+  let update_flags index registers =
     if get index registers == 0
     then set registers R_COND ConditionFlags.fl_zro
     else if get index registers lsr 15 == 1
     then set registers R_COND ConditionFlags.fl_neg
     else set registers R_COND ConditionFlags.fl_pos
   ;;
+
+  let r_r0 = get R_R0
+  let r_r1 = get R_R1
+  let r_r2 = get R_R2
+  let r_r3 = get R_R3
+  let r_r4 = get R_R4
+  let r_r5 = get R_R5
+  let r_r6 = get R_R6
+  let r_r7 = get R_R7
+  let r_pc = get R_PC
+  let r_cond = get R_COND
 end
