@@ -68,4 +68,12 @@ module Registers = struct
   let r_r5 = get R_R5
   let r_r6 = get R_R6
   let r_r7 = get R_R7
+  let set_r_r0 v = set ~index:R_R0 ~value:v
+  let set_r_r1 v = set ~index:R_R1 ~value:v
+  let set_r_r2 v = set ~index:R_R2 ~value:v
+  let set_r_r3 v = set ~index:R_R3 ~value:v
+  let set_r_r4 v = set ~index:R_R4 ~value:v
+  let set_r_r5 v = set ~index:R_R5 ~value:v
+  let set_r_r6 v = set ~index:R_R6 ~value:v
+  let set_r_r7 v = set ~index:R_R7 ~value:v
 end

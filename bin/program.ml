@@ -83,7 +83,7 @@ module Program = struct
       | Value offset -> pc +^ offset
       | Register r -> Registers.get r registers
     in
-    { program with pc = dest; registers = Registers.set ~index:R_R7 ~value:pc registers }
+    { program with pc = dest; registers = Registers.set_r_r7 pc registers }
   ;;
 
   let run_ld
@@ -275,4 +275,3 @@ module Program = struct
     aux program
   ;;
 end
-
