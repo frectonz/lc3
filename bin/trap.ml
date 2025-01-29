@@ -25,11 +25,4 @@ module Trap = struct
     | 0x25 -> Ok TRAP_HALT
     | x -> Error (`UnknownTrap x)
   ;;
-
-  let trap_getc = to_int TRAP_GETC
-  let trap_out = to_int TRAP_OUT
-  let trap_puts = to_int TRAP_PUTS
-  let trap_in = to_int TRAP_IN
-  let trap_putsp = to_int TRAP_PUTSP
-  let trap_halt = to_int TRAP_HALT
 end
