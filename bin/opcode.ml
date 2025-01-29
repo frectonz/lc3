@@ -60,7 +60,7 @@ module OpCode = struct
     let imm_flag = bits instr ~pos:5 ~width:1 in
     let* dr = bits instr ~pos:9 ~width:3 |> Registers.register_of_int in
     let* sr1 = bits instr ~pos:6 ~width:3 |> Registers.register_of_int in
-    if imm_flag == 0
+    if imm_flag = 0
     then
       let* r = bits instr ~width:3 |> Registers.register_of_int in
       Ok { dr; sr1; sr2 = Register r }
@@ -68,7 +68,7 @@ module OpCode = struct
   ;;
 
   let parse_add instr = parse_two_operators instr |> Result.map (fun x -> OP_ADD x)
-  let parse_and instr = parse_two_operators instr |> Result.map (fun x -> OP_ADD x)
+  let parse_and instr = parse_two_operators instr |> Result.map (fun x -> OP_AND x)
 
   let parse_not instr =
     let* dr = bits instr ~pos:9 ~width:3 |> Registers.register_of_int in

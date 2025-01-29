@@ -260,9 +260,9 @@ module Program = struct
       if not prog.running
       then ()
       else (
-        let pc = prog.pc in
-        prog.pc <- pc + 1;
-        let instr = Memory.read ~pos:pc prog.memory in
+        let pos = prog.pc in
+        prog.pc <- pos + 1;
+        let instr = Memory.read ~pos prog.memory in
         let prog =
           OpCode.parse instr |> Result.map (fun op -> run_opcode op prog) |> Result.join
         in
@@ -303,7 +303,7 @@ let setup () =
 
 let run_program path =
   match Program.read path with
-  | Ok image -> 
+  | Ok image ->
     setup ();
     Program.run image
   | Error `FailedToReadImage -> print_endline "failed to load image"
@@ -313,7 +313,6 @@ let run_programs paths = Array.iter run_program paths
 
 let () =
   if Array.length Sys.argv >= 2
-  then (
-    Sys.argv |> Array.remove_first |> run_programs)
+  then Sys.argv |> Array.remove_first |> run_programs
   else print_endline "lc3 [image-file1] ..."
 ;;
