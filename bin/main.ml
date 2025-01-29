@@ -7,6 +7,7 @@ open Utils
 open Registers
 
 let memory_max = 1 lsl 16
+let ( +^ ) x y = (x + y) land 0xffff
 
 module Memory = struct
   type t = int array
@@ -96,6 +97,9 @@ module Trap = struct
   let exec_trap_puts memory registers =
     let rec aux i =
       let c = Memory.get memory (Registers.get R_R0 registers + i) in
+      print_string "c ";
+      print_int c;
+      print_newline ();
       if c = 0
       then ()
       else (
@@ -117,8 +121,7 @@ module Trap = struct
     let c = input_char stdin in
     output_char stdout c;
     flush stdout;
-    let _ = Registers.set registers R_R0 (int_of_char c) |> Registers.update_flags R_R0 in
-    ()
+    Registers.set registers R_R0 (int_of_char c) |> Registers.update_flags R_R0
   ;;
 
   let exec_trap_putsp memory registers =
@@ -160,9 +163,7 @@ module Trap = struct
     | TRAP_PUTS ->
       exec_trap_puts m r;
       r
-    | TRAP_IN ->
-      exec_trap_in r;
-      r
+    | TRAP_IN -> exec_trap_in r
     | TRAP_PUTSP ->
       exec_trap_putsp m r;
       r
@@ -244,7 +245,7 @@ module OpCode = struct
 
   let run_add { dr; sr1; sr2 } registers =
     (Registers.get sr1 registers
-     +
+     +^
      match sr2 with
      | Value x -> x
      | Register r -> Registers.get r registers)
@@ -254,12 +255,12 @@ module OpCode = struct
 
   let parse_ldi instr =
     let* dr = (instr lsr 9) land 0x7 |> Registers.register_of_int in
-    let pc_offset = sign_extend (instr land 0x1F) 9 in
+    let pc_offset = sign_extend (instr land 0x1FF) 9 in
     Ok { dr; pc_offset }
   ;;
 
   let run_ldi { dr; pc_offset } registers memory =
-    Registers.r_pc registers + pc_offset
+    Registers.r_pc registers +^ pc_offset
     |> Memory.get memory
     |> Memory.get memory
     |> Registers.set registers dr
@@ -303,8 +304,8 @@ module OpCode = struct
 
   let run_br { pc_offset; cond_flag } registers =
     let cond = cond_flag land Registers.r_cond registers in
-    if cond = 1
-    then Registers.r_cond registers + pc_offset |> Registers.set registers R_PC
+    if cond <> 0 && Registers.r_cond registers <> 0
+    then Registers.r_cond registers +^ pc_offset |> Registers.set registers R_PC
     else registers
   ;;
 
@@ -329,14 +330,10 @@ module OpCode = struct
   ;;
 
   let run_jsr ({ sr } : op_jsr) registers =
-    Registers.r_pc registers
-    |> Registers.set registers R_R7
-    |>
+    let registers = Registers.set registers R_R7 (Registers.r_pc registers) in
     match sr with
-    | Value v ->
-      fun registers -> Registers.set registers R_PC (Registers.r_pc registers + v)
-    | Register r ->
-      fun registers -> Registers.set registers R_PC (Registers.get r registers)
+    | Value v -> Registers.set registers R_PC (Registers.r_pc registers - 1 +^ v)
+    | Register r -> Registers.set registers R_PC (Registers.get r registers)
   ;;
 
   let parse_ld instr =
@@ -346,7 +343,7 @@ module OpCode = struct
   ;;
 
   let run_ld { dr; pc_offset } registers memory =
-    Registers.r_pc registers + pc_offset
+    Registers.r_pc registers +^ pc_offset
     |> Memory.get memory
     |> Registers.set registers dr
     |> Registers.update_flags dr
@@ -360,7 +357,7 @@ module OpCode = struct
   ;;
 
   let run_ldr { dr; sr; offset } registers memory =
-    Registers.get sr registers + offset
+    Registers.get sr registers +^ offset
     |> Memory.get memory
     |> Registers.set registers dr
     |> Registers.update_flags dr
@@ -372,9 +369,8 @@ module OpCode = struct
     Ok { dr; pc_offset }
   ;;
 
-  let run_lea { dr; pc_offset } registers memory =
-    Registers.r_pc registers + pc_offset
-    |> Memory.get memory
+  let run_lea { dr; pc_offset } registers =
+    Registers.r_pc registers +^ pc_offset
     |> Registers.set registers dr
     |> Registers.update_flags dr
   ;;
@@ -386,7 +382,7 @@ module OpCode = struct
   ;;
 
   let run_st { dr; pc_offset } registers memory =
-    Memory.set memory (Registers.r_pc registers + pc_offset) (Registers.get dr registers)
+    Memory.set memory (Registers.r_pc registers +^ pc_offset) (Registers.get dr registers)
   ;;
 
   let parse_sti instr =
@@ -398,7 +394,7 @@ module OpCode = struct
   let run_sti { dr; pc_offset } registers memory =
     Memory.set
       memory
-      (Registers.r_pc registers + pc_offset |> Memory.get memory)
+      (Registers.r_pc registers +^ pc_offset |> Memory.get memory)
       (Registers.get dr registers)
   ;;
 
@@ -410,10 +406,15 @@ module OpCode = struct
   ;;
 
   let run_str { dr; sr; offset } registers memory =
-    Memory.set memory (Registers.get sr registers + offset) (Registers.get dr registers)
+    Memory.set memory (Registers.get sr registers +^ offset) (Registers.get dr registers)
   ;;
 
-  let parse_trap instr = Trap.of_int (instr land 0xFF) |> Result.map (fun t -> t)
+  let parse_trap instr =
+    print_string "trap ";
+    print_int (instr land 0xFF);
+    print_newline ();
+    Trap.of_int (instr land 0xFF) |> Result.map (fun t -> t)
+  ;;
 end
 
 module Program = struct
@@ -431,6 +432,9 @@ module Program = struct
     let registers = Registers.inc_r_pc program.registers in
     let instr = Registers.r_pc registers |> Memory.get program.memory in
     let op = instr lsr 12 in
+    print_string "opcode: ";
+    print_int op;
+    print_newline ();
     let new_program =
       match op with
       | 0 ->
@@ -488,7 +492,7 @@ module Program = struct
       | 13 -> OpCode.run_res
       | 14 ->
         OpCode.parse_lea instr
-        |> Result.map (fun x -> OpCode.run_lea x registers program.memory)
+        |> Result.map (fun x -> OpCode.run_lea x registers)
         |> Result.map (fun r -> { program with registers = r })
       | 15 ->
         OpCode.parse_trap instr
