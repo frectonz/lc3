@@ -174,8 +174,7 @@ module Program = struct
     let input_state' =
       match input_state with
       | NotAsked -> NotAsked
-      | InputingChar None -> InputingChar (Some ch)
-      | _ -> input_state
+      | InputingChar _ -> InputingChar (Some ch)
     in
     { program with input_state = input_state' }
   ;;
@@ -378,11 +377,12 @@ module Program = struct
   let list_next_n_ops n (program : t) =
     let module W = Nottui_widgets in
     let module A = Notty.A in
-    Array.sub program.memory (program.pc + 1) n
+    let pc = program.pc + 1 in
+    Array.sub program.memory pc n
     |> Array.to_list
-    |> List.map (fun instr ->
+    |> List.mapi (fun i instr ->
       match OpCode.parse instr with
-      | Ok op -> render_op program.pc op
+      | Ok op -> render_op (pc + i) op
       | Error _ -> render_op_parse_error instr)
   ;;
 
