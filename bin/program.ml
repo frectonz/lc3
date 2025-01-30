@@ -293,6 +293,72 @@ module Program = struct
     aux program
   ;;
 
+  let render_current_op pc op =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    W.hbox
+      [ W.string ~attr:A.(fg green ++ st bold) " + " |> Lwd.return
+      ; W.string ~attr:A.(fg (gray 5)) "0x" |> Lwd.return
+      ; W.string ~attr:A.(fg white) (Printf.sprintf "%04x" pc) |> Lwd.return
+      ; W.string ~attr:A.(fg (gray 5)) " → " |> Lwd.return
+      ; OpCode.render op
+      ]
+  ;;
+
+  let render_op pc op =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    W.hbox
+      [ W.string ~attr:A.(fg (gray 5)) " - " |> Lwd.return
+      ; W.string ~attr:A.(fg (gray 5)) "0x" |> Lwd.return
+      ; W.string ~attr:A.(fg white) (Printf.sprintf "%04x" pc) |> Lwd.return
+      ; W.string ~attr:A.(fg (gray 5)) " → " |> Lwd.return
+      ; OpCode.render op
+      ]
+  ;;
+
+  let render_op_parse_error instr =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    W.string ~attr:A.(fg red) (Printf.sprintf "Invalid instruction: 0x%04x" instr)
+    |> Lwd.return
+  ;;
+
+  let next10 (program : t) =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    Array.sub program.memory (program.pc + 1) 10
+    |> Array.to_list
+    |> List.map (fun instr ->
+      match OpCode.parse instr with
+      | Ok op -> render_op program.pc op
+      | Error _ -> render_op_parse_error instr)
+  ;;
+
+  let render_ops (program : t) =
+    let open Nottui in
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let header = Utils.header "INSTRUCTIONS" in
+    let current_instr = Memory.read ~pos:program.pc program.memory in
+    match OpCode.parse current_instr with
+    | Ok op ->
+      W.vbox
+        (header
+         :: (Ui.space 0 1 |> Lwd.return)
+         :: render_current_op program.pc op
+         :: next10 program)
+    | Error _ ->
+      W.vbox
+        [ header
+        ; Ui.space 0 1 |> Lwd.return
+        ; W.string
+            ~attr:A.(fg red)
+            (Printf.sprintf "Invalid instruction: 0x%04x" current_instr)
+          |> Lwd.return
+        ]
+  ;;
+
   let render (program : t) =
     let open Nottui in
     let module W = Nottui_widgets in
@@ -300,32 +366,7 @@ module Program = struct
     (* Render registers panel *)
     let registers = Registers.render program.registers in
     (* Render current instruction panel *)
-    let current_op =
-      let current_instr = Memory.read ~pos:program.pc program.memory in
-      match OpCode.parse current_instr with
-      | Ok op ->
-        let op_str = OpCode.render op in
-        W.vbox
-          [ Utils.header "CURRENT INSTRUCTION"
-          ; Ui.space 0 1 |> Lwd.return
-          ; W.hbox
-              [ W.string ~attr:A.(fg (gray 5)) "0x" |> Lwd.return
-              ; W.string ~attr:A.(fg white) (Printf.sprintf "%04x" program.pc)
-                |> Lwd.return
-              ; W.string ~attr:A.(fg (gray 5)) " → " |> Lwd.return
-              ; op_str
-              ]
-          ]
-      | Error _ ->
-        W.vbox
-          [ Utils.header "CURRENT INSTRUCTION"
-          ; Ui.space 0 1 |> Lwd.return
-          ; W.string
-              ~attr:A.(fg red)
-              (Printf.sprintf "Invalid instruction: 0x%04x" current_instr)
-            |> Lwd.return
-          ]
-    in
+    let ops = render_ops program in
     (* Render output buffer panel *)
     let output_panel =
       W.vbox
@@ -333,6 +374,6 @@ module Program = struct
          :: (Ui.space 0 1 |> Lwd.return)
          :: List.map (fun line -> W.string line |> Lwd.return) [ "" ])
     in
-    W.v_pane (W.h_pane registers current_op) output_panel
+    W.v_pane (W.h_pane registers ops) output_panel
   ;;
 end

@@ -4,25 +4,25 @@ open Array_ext
 (* let original_tio = Unix.tcgetattr Unix.stdin *)
 
 (* let disable_input_buffering () = *)
-  (* let open Unix in *)
-  (* let new_tio = { original_tio with c_icanon = false; c_echo = false } in *)
-  (* tcsetattr stdin TCSANOW new_tio *)
+(* let open Unix in *)
+(* let new_tio = { original_tio with c_icanon = false; c_echo = false } in *)
+(* tcsetattr stdin TCSANOW new_tio *)
 (* ;; *)
 
 (* let restore_input_buffering () = *)
-  (* let open Unix in *)
-  (* tcsetattr stdin TCSANOW original_tio *)
+(* let open Unix in *)
+(* tcsetattr stdin TCSANOW original_tio *)
 (* ;; *)
 
 (* let handle_interrupt _ = *)
-  (* restore_input_buffering (); *)
-  (* print_newline (); *)
-  (* exit (-2) *)
+(* restore_input_buffering (); *)
+(* print_newline (); *)
+(* exit (-2) *)
 (* ;; *)
 
 (* let setup () = *)
-  (* Sys.set_signal Sys.sigint (Sys.Signal_handle handle_interrupt); *)
-  (* disable_input_buffering () *)
+(* Sys.set_signal Sys.sigint (Sys.Signal_handle handle_interrupt); *)
+(* disable_input_buffering () *)
 (* ;; *)
 
 let action_handler app = function
