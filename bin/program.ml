@@ -392,12 +392,12 @@ module Program = struct
   let list_next_n_ops n (program : t) =
     let module W = Nottui_widgets in
     let module A = Notty.A in
-    let pc = program.pc + 1 in
+    let pc = program.pc in
     Array.sub program.memory pc n
     |> Array.to_list
     |> List.mapi (fun i instr ->
       match OpCode.parse instr with
-      | Ok op -> render_op (pc + i) op
+      | Ok op -> render_op (pc + i + 1) op
       | Error _ -> render_op_parse_error instr)
   ;;
 
@@ -406,7 +406,7 @@ module Program = struct
     let module W = Nottui_widgets in
     let module A = Notty.A in
     let header = Utils.header "INSTRUCTIONS" in
-    let current_instr = Memory.read ~pos:program.pc program.memory in
+    let current_instr = Memory.read ~pos:(program.pc - 1) program.memory in
     match OpCode.parse current_instr with
     | Ok op ->
       W.vbox
