@@ -274,4 +274,47 @@ module Program = struct
     in
     aux program
   ;;
+
+  let render (program : t) =
+    let open Nottui in
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    (* Render registers panel *)
+    let registers = Registers.render program.registers in
+    (* Render current instruction panel *)
+    let current_op =
+      let current_instr = Memory.read ~pos:program.pc program.memory in
+      match OpCode.parse current_instr with
+      | Ok op ->
+        let op_str = OpCode.render op in
+        W.vbox
+          [ Utils.header "CURRENT INSTRUCTION"
+          ; Ui.space 0 1 |> Lwd.return
+          ; W.hbox
+              [ W.string ~attr:A.(fg (gray 5)) "0x" |> Lwd.return
+              ; W.string ~attr:A.(fg white) (Printf.sprintf "%04x" program.pc)
+                |> Lwd.return
+              ; W.string ~attr:A.(fg (gray 5)) " → " |> Lwd.return
+              ; op_str
+              ]
+          ]
+      | Error _ ->
+        W.vbox
+          [ Utils.header "CURRENT INSTRUCTION"
+          ; Ui.space 0 1 |> Lwd.return
+          ; W.string
+              ~attr:A.(fg red)
+              (Printf.sprintf "Invalid instruction: 0x%04x" current_instr)
+            |> Lwd.return
+          ]
+    in
+    (* Render output buffer panel *)
+    let output_panel =
+      W.vbox
+        (Utils.header "PROGRAM OUTPUT"
+         :: (Ui.space 0 1 |> Lwd.return)
+         :: List.map (fun line -> W.string line |> Lwd.return) [ "" ])
+    in
+    W.v_pane (W.h_pane registers current_op) output_panel
+  ;;
 end

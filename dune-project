@@ -19,7 +19,7 @@
  (name lc3)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml dune)
+ (depends ocaml dune notty nottui)
  (tags
   (topics "to describe" your project)))
 

@@ -28,9 +28,14 @@ let setup () =
 let run_program path =
   match Program.read path with
   | Ok image ->
+    let open Nottui in
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let ui = Lwd.var image |> Lwd.get |> Lwd.map ~f:Program.render |> Lwd.join in
     setup ();
-    Program.run image
-  | Error `FailedToReadImage -> print_endline "failed to load image"
+    Program.run image;
+    Ui_loop.run ui
+  | Error _ -> print_endline "failed to load image"
 ;;
 
 let run_programs paths = Array.iter run_program paths
