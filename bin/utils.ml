@@ -15,3 +15,9 @@ let sign_extend x bit_count =
 
 let signed_bits ?(pos = 0) ~width n = sign_extend (bits ~pos ~width n) width
 let ( +^ ) x y = (x + y) land 0xffff
+
+let header title =
+  let module W = Nottui_widgets in
+  let module A = Notty.A in
+  W.string ~attr:A.(fg lightblue ++ st bold) title |> Lwd.return
+;;
