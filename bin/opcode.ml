@@ -170,4 +170,68 @@ module OpCode = struct
     | 15 -> parse_trap instr
     | x -> Error (`UnknownOp x)
   ;;
+
+  let render_register (r : Registers.register) =
+    match r with
+    | R_R0 -> "R0"
+    | R_R1 -> "R1"
+    | R_R2 -> "R2"
+    | R_R3 -> "R3"
+    | R_R4 -> "R4"
+    | R_R5 -> "R5"
+    | R_R6 -> "R6"
+    | R_R7 -> "R7"
+  ;;
+
+  let render_register_or_value = function
+    | Value v -> Printf.sprintf "0x%04x" v
+    | Register r -> render_register r
+  ;;
+
+  let render (op : t) =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let op_str =
+      match op with
+      | OP_ADD { dr; sr1; sr2 } ->
+        Printf.sprintf
+          "ADD %s %s %s"
+          (render_register dr)
+          (render_register sr1)
+          (render_register_or_value sr2)
+      | OP_AND { dr; sr1; sr2 } ->
+        Printf.sprintf
+          "AND %s %s %s"
+          (render_register dr)
+          (render_register sr1)
+          (render_register_or_value sr2)
+      | OP_BR { pc_offset; cond_flag } ->
+        let n = if cond_flag land 4 != 0 then "n" else "" in
+        let z = if cond_flag land 2 != 0 then "z" else "" in
+        let p = if cond_flag land 1 != 0 then "p" else "" in
+        Printf.sprintf "BR%s%s%s 0x%04x" n z p pc_offset
+      | OP_LD { dr; pc_offset } ->
+        Printf.sprintf "LD %s 0x%04x" (render_register dr) pc_offset
+      | OP_ST { dr; pc_offset } ->
+        Printf.sprintf "ST %s 0x%04x" (render_register dr) pc_offset
+      | OP_JSR { sr } -> Printf.sprintf "JSR %s" (render_register_or_value sr)
+      | OP_LDR { dr; sr; offset } ->
+        Printf.sprintf "LDR %s %s 0x%04x" (render_register dr) (render_register sr) offset
+      | OP_STR { dr; sr; offset } ->
+        Printf.sprintf "STR %s %s 0x%04x" (render_register dr) (render_register sr) offset
+      | OP_RTI -> "RTI"
+      | OP_NOT { dr; sr } ->
+        Printf.sprintf "NOT %s %s" (render_register dr) (render_register sr)
+      | OP_LDI { dr; pc_offset } ->
+        Printf.sprintf "LDI %s 0x%04x" (render_register dr) pc_offset
+      | OP_STI { dr; pc_offset } ->
+        Printf.sprintf "STI %s 0x%04x" (render_register dr) pc_offset
+      | OP_JMP { dr } -> Printf.sprintf "JMP %s" (render_register dr)
+      | OP_RES -> "RES"
+      | OP_LEA { dr; pc_offset } ->
+        Printf.sprintf "LEA %s 0x%04x" (render_register dr) pc_offset
+      | OP_TRAP trap -> Printf.sprintf "TRAP %s" (Trap.to_string trap)
+    in
+    W.string ~attr:A.(fg yellow) op_str |> Lwd.return
+  ;;
 end
