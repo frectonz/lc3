@@ -254,6 +254,24 @@ module Program = struct
     | OpCode.OP_TRAP Trap.TRAP_HALT -> Ok (exec_trap_halt program)
   ;;
 
+  let step prog =
+    if not prog.running
+    then prog
+    else (
+      let pos = prog.pc in
+      prog.pc <- pos + 1;
+      let instr = Memory.read ~pos prog.memory in
+      let prog =
+        OpCode.parse instr |> Result.map (fun op -> run_opcode op prog) |> Result.join
+      in
+      match prog with
+      | Ok prog -> prog
+      | Error `Unused -> failwith "unused"
+      | Error (`UnknownOp _) -> failwith "unknown op"
+      | Error (`UnknownTrap _) -> failwith "unkown trap"
+      | Error (`UnkownRegister _) -> failwith "unkown register")
+  ;;
+
   let run (program : t) =
     let rec aux prog =
       if not prog.running
