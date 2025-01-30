@@ -29,6 +29,9 @@ let action_handler app = function
   | `Arrow `Down, _ ->
     app |> Lwd.peek |> Program.step |> Lwd.set app;
     `Handled
+  | `ASCII ch, _ ->
+    app |> Lwd.peek |> Program.add_key ch |> Lwd.set app;
+    `Handled
   | _ -> `Unhandled
 ;;
 

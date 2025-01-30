@@ -5,12 +5,18 @@ open Memory
 open Registers
 
 module Program = struct
+  type input_state =
+    | NotAsked
+    | InputingChar of char option
+
   type t =
     { memory : Memory.t
     ; registers : Registers.t
     ; cond : int
     ; mutable pc : int
     ; mutable running : bool
+    ; mutable output_buffer : string
+    ; input_state : input_state
     }
 
   let read image_path =
@@ -21,6 +27,8 @@ module Program = struct
       ; cond = Constants.fl_zro
       ; pc = 0x3000
       ; running = true
+      ; output_buffer = ""
+      ; input_state = NotAsked
       }
   ;;
 
@@ -162,15 +170,28 @@ module Program = struct
   let run_rti (_ : t) : (t, _) result = Error `Unused
   let run_res (_ : t) : (t, _) result = Error `Unused
 
-  let exec_trap_getc ({ registers; _ } as program : t) =
-    let registers' =
-      Registers.set ~index:R_R0 ~value:(input_char stdin |> int_of_char) registers
+  let add_key (ch : char) ({ input_state; _ } as program : t) =
+    let input_state' =
+      match input_state with
+      | NotAsked -> NotAsked
+      | InputingChar None -> InputingChar (Some ch)
+      | _ -> input_state
     in
-    { program with registers = registers' } |> update_flags R_R0
+    { program with input_state = input_state' }
+  ;;
+
+  let exec_trap_getc ({ registers; input_state; _ } as program : t) =
+    match input_state with
+    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
+    | InputingChar (Some c) ->
+      let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
+      { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
+    | _ -> program
   ;;
 
   let exec_trap_out ({ registers; _ } as program : t) =
-    Registers.r_r0 registers |> char_of_int |> output_char stdout;
+    let char = Registers.r_r0 registers |> char_of_int in
+    program.output_buffer <- program.output_buffer ^ String.make 1 char;
     flush stdout;
     program
   ;;
@@ -181,7 +202,7 @@ module Program = struct
       if c = 0
       then ()
       else (
-        output_char stdout (char_of_int c);
+        program.output_buffer <- program.output_buffer ^ String.make 1 (char_of_int c);
         aux (i + 1))
     in
     aux 0;
@@ -189,14 +210,15 @@ module Program = struct
     program
   ;;
 
-  let exec_trap_in ({ registers; _ } as program : t) =
-    print_string "Enter a character: ";
-    flush stdout;
-    let c = input_char stdin in
-    output_char stdout c;
-    flush stdout;
-    let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
-    { program with registers = registers' } |> update_flags R_R0
+  let exec_trap_in ({ registers; input_state; _ } as program : t) =
+    match input_state with
+    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
+    | InputingChar (Some c) ->
+      program.output_buffer <- program.output_buffer ^ "Enter a character: ";
+      program.output_buffer <- program.output_buffer ^ String.make 1 c;
+      let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
+      { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
+    | _ -> program
   ;;
 
   let exec_trap_putsp ({ registers; memory; _ } as program : t) =
@@ -209,22 +231,22 @@ module Program = struct
         if char1 = 0
         then ()
         else (
-          output_char stdout (char_of_int char1);
+          program.output_buffer
+          <- program.output_buffer ^ String.make 1 (char_of_int char1);
           let char2 = bits c ~pos:8 ~width:8 in
           if char2 = 0
           then ()
           else (
-            output_char stdout (char_of_int char2);
+            program.output_buffer
+            <- program.output_buffer ^ String.make 1 (char_of_int char2);
             aux (i + 1))))
     in
     aux 0;
-    flush stdout;
     program
   ;;
 
   let exec_trap_halt (program : t) =
-    print_endline "HALT";
-    flush stdout;
+    program.output_buffer <- program.output_buffer ^ "HALT\n";
     program.running <- false;
     program
   ;;
@@ -254,8 +276,16 @@ module Program = struct
     | OpCode.OP_TRAP Trap.TRAP_HALT -> Ok (exec_trap_halt program)
   ;;
 
+  let should_continue ({ input_state; _ } : t) =
+    match input_state with
+    | NotAsked -> true
+    | InputingChar opt -> Option.is_some opt
+  ;;
+
   let step prog =
-    if not prog.running
+    if not (should_continue prog)
+    then prog
+    else if not prog.running
     then prog
     else (
       let pos = prog.pc in
@@ -380,6 +410,18 @@ module Program = struct
         ]
   ;;
 
+  let render_input_state (program : t) =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let input_state_str =
+      match program.input_state with
+      | NotAsked -> "Input State: Not Asked"
+      | InputingChar None -> "Input State: Inputting Character (waiting)"
+      | InputingChar (Some c) -> Printf.sprintf "Input State: Inputting Character (%c)" c
+    in
+    W.string ~attr:A.(fg white) input_state_str |> Lwd.return
+  ;;
+
   let render (program : t) =
     let open Nottui in
     let module W = Nottui_widgets in
@@ -387,12 +429,17 @@ module Program = struct
     let registers = Registers.render program.registers in
     let special_registers = render_special_registers program in
     let ops = render_ops program in
+    let input_state_panel =
+      W.vbox [ Utils.header "INPUT STATE"; render_input_state program ]
+    in
     let output_panel =
       W.vbox
         (Utils.header "PROGRAM OUTPUT"
          :: (Ui.space 0 1 |> Lwd.return)
-         :: List.map (fun line -> W.string line |> Lwd.return) [ "" ])
+         :: List.map (fun line -> W.string line |> Lwd.return) [ program.output_buffer ])
     in
-    W.v_pane (W.h_pane (W.v_pane registers special_registers) ops) output_panel
+    W.h_pane
+      output_panel
+      (W.v_pane (W.v_pane registers special_registers) (W.v_pane ops input_state_panel))
   ;;
 end
