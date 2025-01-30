@@ -91,7 +91,7 @@ module Registers = struct
     in
     W.vbox
       [ Utils.header "REGISTERS"
-      ; Ui.space 0 2 |> Lwd.return
+      ; Ui.space 0 1 |> Lwd.return
       ; reg_line "R0" registers.r_r0
       ; reg_line "R1" registers.r_r1
       ; reg_line "R2" registers.r_r2

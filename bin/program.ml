@@ -293,6 +293,27 @@ module Program = struct
     aux program
   ;;
 
+  let render_special_registers (program : t) =
+    let open Nottui in
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let title = Utils.header "SPECIAL REGISTERS" in
+    let reg_line name value =
+      W.hbox
+        [ W.string ~attr:A.(fg green ++ st bold) (Printf.sprintf "%-8s" name)
+          |> Lwd.return
+        ; W.string ~attr:A.(fg (gray 5)) "0x" |> Lwd.return
+        ; W.string ~attr:A.(fg white) (Printf.sprintf "%04x" value) |> Lwd.return
+        ]
+    in
+    W.vbox
+      [ title
+      ; Ui.space 0 1 |> Lwd.return
+      ; reg_line "R_PC" program.pc
+      ; reg_line "R_COND" program.cond
+      ]
+  ;;
+
   let render_current_op pc op =
     let module W = Nottui_widgets in
     let module A = Notty.A in
@@ -363,17 +384,15 @@ module Program = struct
     let open Nottui in
     let module W = Nottui_widgets in
     let module A = Notty.A in
-    (* Render registers panel *)
     let registers = Registers.render program.registers in
-    (* Render current instruction panel *)
+    let special_registers = render_special_registers program in
     let ops = render_ops program in
-    (* Render output buffer panel *)
     let output_panel =
       W.vbox
         (Utils.header "PROGRAM OUTPUT"
          :: (Ui.space 0 1 |> Lwd.return)
          :: List.map (fun line -> W.string line |> Lwd.return) [ "" ])
     in
-    W.v_pane (W.h_pane registers ops) output_panel
+    W.v_pane (W.h_pane (W.v_pane registers special_registers) ops) output_panel
   ;;
 end
