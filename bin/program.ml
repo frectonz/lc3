@@ -375,10 +375,10 @@ module Program = struct
     |> Lwd.return
   ;;
 
-  let next10 (program : t) =
+  let list_next_n_ops n (program : t) =
     let module W = Nottui_widgets in
     let module A = Notty.A in
-    Array.sub program.memory (program.pc + 1) 10
+    Array.sub program.memory (program.pc + 1) n
     |> Array.to_list
     |> List.map (fun instr ->
       match OpCode.parse instr with
@@ -398,7 +398,7 @@ module Program = struct
         (header
          :: (Ui.space 0 1 |> Lwd.return)
          :: render_current_op program.pc op
-         :: next10 program)
+         :: list_next_n_ops 5 program)
     | Error _ ->
       W.vbox
         [ header
@@ -430,7 +430,11 @@ module Program = struct
     let special_registers = render_special_registers program in
     let ops = render_ops program in
     let input_state_panel =
-      W.vbox [ Utils.header "INPUT STATE"; render_input_state program ]
+      W.vbox
+        [ Utils.header "INPUT STATE"
+        ; Ui.space 0 1 |> Lwd.return
+        ; render_input_state program
+        ]
     in
     let output_panel =
       W.vbox
