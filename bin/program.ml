@@ -179,9 +179,14 @@ module Program = struct
     { program with input_state = input_state' }
   ;;
 
+  let ask_input ({ input_state; _ } as program : t) =
+    match input_state with
+    | NotAsked -> { program with input_state = InputingChar None }
+    | _ -> program
+  ;;
+
   let exec_trap_getc ({ registers; input_state; _ } as program : t) =
     match input_state with
-    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
     | InputingChar (Some c) ->
       let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
       { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
@@ -211,7 +216,6 @@ module Program = struct
 
   let exec_trap_in ({ registers; input_state; _ } as program : t) =
     match input_state with
-    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
     | InputingChar (Some c) ->
       program.output_buffer <- program.output_buffer ^ "Enter a character: ";
       program.output_buffer <- program.output_buffer ^ String.make 1 c;
@@ -281,6 +285,15 @@ module Program = struct
     | InputingChar opt -> Option.is_some opt
   ;;
 
+  let unwrap_prog prog =
+    match prog with
+    | Ok prog -> prog
+    | Error `Unused -> failwith "unused"
+    | Error (`UnknownOp _) -> failwith "unknown op"
+    | Error (`UnknownTrap _) -> failwith "unkown trap"
+    | Error (`UnkownRegister _) -> failwith "unkown register"
+  ;;
+
   let step prog =
     if not (should_continue prog)
     then prog
@@ -291,14 +304,16 @@ module Program = struct
       prog.pc <- pos + 1;
       let instr = Memory.read ~pos prog.memory in
       let prog =
-        OpCode.parse instr |> Result.map (fun op -> run_opcode op prog) |> Result.join
+        OpCode.parse instr
+        |> Result.map (fun op -> run_opcode op prog)
+        |> Result.join
+        |> unwrap_prog
       in
-      match prog with
-      | Ok prog -> prog
-      | Error `Unused -> failwith "unused"
-      | Error (`UnknownOp _) -> failwith "unknown op"
-      | Error (`UnknownTrap _) -> failwith "unkown trap"
-      | Error (`UnkownRegister _) -> failwith "unkown register")
+      let next_instr = Memory.read ~pos:prog.pc prog.memory in
+      let next_op = OpCode.parse next_instr |> unwrap_prog in
+      match next_op with
+      | OpCode.OP_TRAP (Trap.TRAP_GETC | Trap.TRAP_IN) -> ask_input prog
+      | _ -> prog)
   ;;
 
   let run (program : t) =
