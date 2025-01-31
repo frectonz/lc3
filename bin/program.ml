@@ -179,18 +179,38 @@ module Program = struct
     { program with input_state = input_state' }
   ;;
 
-  let ask_input ({ input_state; _ } as program : t) =
-    match input_state with
-    | NotAsked -> { program with input_state = InputingChar None }
-    | _ -> program
+  let exec_trap_getc (program : t) =
+    match program.input_state with
+    | InputingChar (Some c) ->
+      let registers' =
+        Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
+      in
+      { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
+    | InputingChar None -> { program with pc = program.pc - 1 }
+    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
   ;;
 
-  let exec_trap_getc ({ registers; input_state; _ } as program : t) =
-    match input_state with
+  let exec_trap_in (program : t) =
+    match program.input_state with
+    | NotAsked ->
+      let program' =
+        { program with
+          output_buffer = program.output_buffer ^ "Enter a character: "
+        ; input_state = InputingChar None
+        ; pc = program.pc - 1
+        }
+      in
+      program'
     | InputingChar (Some c) ->
-      let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
-      { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
-    | _ -> program
+      let program' =
+        { program with
+          output_buffer = program.output_buffer ^ String.make 1 c
+        ; registers = Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
+        ; input_state = NotAsked
+        }
+      in
+      update_flags R_R0 program'
+    | InputingChar None -> { program with pc = program.pc - 1 }
   ;;
 
   let exec_trap_out ({ registers; _ } as program : t) =
@@ -210,16 +230,6 @@ module Program = struct
     in
     aux 0;
     program
-  ;;
-
-  let exec_trap_in ({ registers; input_state; _ } as program : t) =
-    match input_state with
-    | InputingChar (Some c) ->
-      program.output_buffer <- program.output_buffer ^ "Enter a character: ";
-      program.output_buffer <- program.output_buffer ^ String.make 1 c;
-      let registers' = Registers.set ~index:R_R0 ~value:(int_of_char c) registers in
-      { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
-    | _ -> program
   ;;
 
   let exec_trap_putsp ({ registers; memory; _ } as program : t) =
@@ -312,11 +322,7 @@ module Program = struct
         |> Result.join
         |> unwrap_prog
       in
-      let next_instr = Memory.read ~pos:prog.pc prog.memory in
-      let next_op = OpCode.parse next_instr |> unwrap_prog in
-      match next_op with
-      | OpCode.OP_TRAP (Trap.TRAP_GETC | Trap.TRAP_IN) -> ask_input prog
-      | _ -> prog)
+      prog)
   ;;
 
   let run (program : t) =
