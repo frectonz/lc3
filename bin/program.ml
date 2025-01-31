@@ -196,7 +196,6 @@ module Program = struct
   let exec_trap_out ({ registers; _ } as program : t) =
     let char = Registers.r_r0 registers |> char_of_int in
     program.output_buffer <- program.output_buffer ^ String.make 1 char;
-    flush stdout;
     program
   ;;
 
@@ -210,7 +209,6 @@ module Program = struct
         aux (i + 1))
     in
     aux 0;
-    flush stdout;
     program
   ;;
 
@@ -271,12 +269,17 @@ module Program = struct
     | OpCode.OP_STI x -> Ok (run_sti x program)
     | OpCode.OP_JMP x -> Ok (run_jmp x program)
     | OpCode.OP_LEA x -> Ok (run_lea x program)
-    | OpCode.OP_TRAP Trap.TRAP_GETC -> Ok (exec_trap_getc program)
-    | OpCode.OP_TRAP Trap.TRAP_OUT -> Ok (exec_trap_out program)
-    | OpCode.OP_TRAP Trap.TRAP_PUTS -> Ok (exec_trap_puts program)
-    | OpCode.OP_TRAP Trap.TRAP_IN -> Ok (exec_trap_in program)
-    | OpCode.OP_TRAP Trap.TRAP_PUTSP -> Ok (exec_trap_putsp program)
-    | OpCode.OP_TRAP Trap.TRAP_HALT -> Ok (exec_trap_halt program)
+    | OpCode.OP_TRAP t ->
+      let prog =
+        { program with registers = Registers.set_r_r7 program.pc program.registers }
+      in
+      (match t with
+       | Trap.TRAP_GETC -> Ok (exec_trap_getc prog)
+       | Trap.TRAP_OUT -> Ok (exec_trap_out prog)
+       | Trap.TRAP_PUTS -> Ok (exec_trap_puts prog)
+       | Trap.TRAP_IN -> Ok (exec_trap_in prog)
+       | Trap.TRAP_PUTSP -> Ok (exec_trap_putsp prog)
+       | Trap.TRAP_HALT -> Ok (exec_trap_halt prog))
   ;;
 
   let should_continue ({ input_state; _ } : t) =
