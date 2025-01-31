@@ -183,35 +183,28 @@ module Program = struct
 
   let exec_trap_getc (program : t) =
     match program.input_state with
+    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
     | InputingChar (Some c) ->
-      let registers' =
-        Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
-      in
+      let registers' = Registers.set_r_r0 (int_of_char c) program.registers in
       { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
     | InputingChar None -> program
-    | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
   ;;
 
   let exec_trap_in (program : t) =
     match program.input_state with
     | NotAsked ->
-      let program' =
-        { program with
-          output_buffer = program.output_buffer ^ "Enter a character: "
-        ; input_state = InputingChar None
-        ; pc = program.pc - 1
-        }
-      in
-      program'
+      { program with
+        output_buffer = program.output_buffer ^ "Enter a character: "
+      ; input_state = InputingChar None
+      ; pc = program.pc - 1
+      }
     | InputingChar (Some c) ->
-      let program' =
-        { program with
-          registers = Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
-        ; input_state = NotAsked
-        }
-        |> update_output_buffer c
-      in
-      update_flags R_R0 program'
+      { program with
+        registers = Registers.set_r_r0 (int_of_char c) program.registers
+      ; input_state = NotAsked
+      }
+      |> update_output_buffer c
+      |> update_flags R_R0
     | InputingChar None -> program
   ;;
 
@@ -230,7 +223,7 @@ module Program = struct
 
   let exec_trap_putsp (program : t) =
     let rec aux i prog =
-      let c = Memory.read ~pos:(Registers.get R_R0 prog.registers + i) prog.memory in
+      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
       if c = 0
       then prog
       else (
