@@ -13,9 +13,9 @@ module Program = struct
     { memory : Memory.t
     ; registers : Registers.t
     ; cond : int
-    ; mutable pc : int
-    ; mutable running : bool
-    ; mutable output_buffer : string
+    ; pc : int
+    ; running : bool
+    ; output_buffer : string
     ; input_state : input_state
     }
 
@@ -38,9 +38,7 @@ module Program = struct
       if v = 0
       then Constants.fl_zro
       else if bits v ~pos:15 ~width:1 <> 0
-      then
-        (* A 1 in the left-most bit indicates negative. *)
-        Constants.fl_neg
+      then Constants.fl_neg
       else Constants.fl_pos
     in
     { program with cond = fl }
@@ -213,53 +211,46 @@ module Program = struct
     | InputingChar None -> { program with pc = program.pc - 1 }
   ;;
 
+  let update_output_buffer ch ({ output_buffer; _ } as program : t) =
+    { program with output_buffer = output_buffer ^ String.make 1 ch }
+  ;;
+
   let exec_trap_out ({ registers; _ } as program : t) =
     let char = Registers.r_r0 registers |> char_of_int in
-    program.output_buffer <- program.output_buffer ^ String.make 1 char;
-    program
+    update_output_buffer char program
   ;;
 
-  let exec_trap_puts ({ registers; memory; _ } as program : t) =
-    let rec aux i =
-      let c = Memory.read ~pos:(Registers.r_r0 registers + i) memory in
-      if c = 0
-      then ()
-      else (
-        program.output_buffer <- program.output_buffer ^ String.make 1 (char_of_int c);
-        aux (i + 1))
+  let exec_trap_puts (program : t) =
+    let rec aux i prog =
+      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      if c = 0 then prog else aux (i + 1) (update_output_buffer (char_of_int c) prog)
     in
-    aux 0;
-    program
+    aux 0 program
   ;;
 
-  let exec_trap_putsp ({ registers; memory; _ } as program : t) =
-    let rec aux i =
-      let c = Memory.read ~pos:(Registers.get R_R0 registers + i) memory in
+  let exec_trap_putsp (program : t) =
+    let rec aux i prog =
+      let c = Memory.read ~pos:(Registers.get R_R0 prog.registers + i) prog.memory in
       if c = 0
-      then ()
+      then prog
       else (
         let char1 = bits c ~width:8 in
         if char1 = 0
-        then ()
+        then prog
         else (
-          program.output_buffer
-          <- program.output_buffer ^ String.make 1 (char_of_int char1);
+          let prog = update_output_buffer (char_of_int char1) prog in
           let char2 = bits c ~pos:8 ~width:8 in
           if char2 = 0
-          then ()
+          then prog
           else (
-            program.output_buffer
-            <- program.output_buffer ^ String.make 1 (char_of_int char2);
-            aux (i + 1))))
+            let prog = update_output_buffer (char_of_int char2) prog in
+            aux (i + 1) prog)))
     in
-    aux 0;
-    program
+    aux 0 program
   ;;
 
   let exec_trap_halt (program : t) =
-    program.output_buffer <- program.output_buffer ^ "HALT\n";
-    program.running <- false;
-    program
+    { program with running = false; output_buffer = program.output_buffer ^ "HALT" }
   ;;
 
   let run_opcode (op : OpCode.t) (program : t) =
@@ -314,7 +305,7 @@ module Program = struct
     then prog
     else (
       let pos = prog.pc in
-      prog.pc <- pos + 1;
+      let prog = { prog with pc = pos + 1 } in
       let instr = Memory.read ~pos prog.memory in
       let prog =
         OpCode.parse instr
@@ -331,7 +322,7 @@ module Program = struct
       then ()
       else (
         let pos = prog.pc in
-        prog.pc <- pos + 1;
+        let prog = { prog with pc = pos + 1 } in
         let instr = Memory.read ~pos prog.memory in
         let prog =
           OpCode.parse instr |> Result.map (fun op -> run_opcode op prog) |> Result.join
