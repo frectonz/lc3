@@ -177,6 +177,10 @@ module Program = struct
     { program with input_state = input_state' }
   ;;
 
+  let update_output_buffer ch ({ output_buffer; _ } as program : t) =
+    { program with output_buffer = output_buffer ^ String.make 1 ch }
+  ;;
+
   let exec_trap_getc (program : t) =
     match program.input_state with
     | InputingChar (Some c) ->
@@ -184,7 +188,7 @@ module Program = struct
         Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
       in
       { program with registers = registers'; input_state = NotAsked } |> update_flags R_R0
-    | InputingChar None -> { program with pc = program.pc - 1 }
+    | InputingChar None -> program
     | NotAsked -> { program with input_state = InputingChar None; pc = program.pc - 1 }
   ;;
 
@@ -202,17 +206,13 @@ module Program = struct
     | InputingChar (Some c) ->
       let program' =
         { program with
-          output_buffer = program.output_buffer ^ String.make 1 c
-        ; registers = Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
+          registers = Registers.set ~index:R_R0 ~value:(int_of_char c) program.registers
         ; input_state = NotAsked
         }
+        |> update_output_buffer c
       in
       update_flags R_R0 program'
-    | InputingChar None -> { program with pc = program.pc - 1 }
-  ;;
-
-  let update_output_buffer ch ({ output_buffer; _ } as program : t) =
-    { program with output_buffer = output_buffer ^ String.make 1 ch }
+    | InputingChar None -> program
   ;;
 
   let exec_trap_out ({ registers; _ } as program : t) =
