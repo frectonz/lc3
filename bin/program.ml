@@ -190,6 +190,13 @@ module Program = struct
     | InputingChar None -> program
   ;;
 
+  let exec_trap_getc_unix (program : t) =
+    let registers' =
+      Registers.set_r_r0 (input_char stdin |> int_of_char) program.registers
+    in
+    { program with registers = registers' } |> update_flags R_R0
+  ;;
+
   let exec_trap_in (program : t) =
     match program.input_state with
     | NotAsked ->
@@ -208,9 +215,27 @@ module Program = struct
     | InputingChar None -> program
   ;;
 
+  let exec_trap_in_unix (program : t) =
+    print_string "Enter a character: ";
+    flush stdout;
+    let c = input_char stdin in
+    output_char stdout c;
+    flush stdout;
+    { program with registers = Registers.set_r_r0 (int_of_char c) program.registers }
+    |> update_output_buffer c
+    |> update_flags R_R0
+  ;;
+
   let exec_trap_out ({ registers; _ } as program : t) =
     let char = Registers.r_r0 registers |> char_of_int in
     update_output_buffer char program
+  ;;
+
+  let exec_trap_out_unix ({ registers; _ } as program : t) =
+    let char = Registers.r_r0 registers |> char_of_int in
+    output_char stdout char;
+    flush stdout;
+    program
   ;;
 
   let exec_trap_puts (program : t) =
@@ -219,6 +244,20 @@ module Program = struct
       if c = 0 then prog else aux (i + 1) (update_output_buffer (char_of_int c) prog)
     in
     aux 0 program
+  ;;
+
+  let exec_trap_puts_unix (program : t) =
+    let rec aux i prog =
+      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      if c = 0
+      then prog
+      else (
+        output_char stdout (char_of_int c);
+        aux (i + 1) prog)
+    in
+    let prog = aux 0 program in
+    flush stdout;
+    prog
   ;;
 
   let exec_trap_putsp (program : t) =
@@ -242,8 +281,37 @@ module Program = struct
     aux 0 program
   ;;
 
+  let exec_trap_putsp_unix (program : t) =
+    let rec aux i prog =
+      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      if c = 0
+      then prog
+      else (
+        let char1 = bits c ~width:8 in
+        if char1 = 0
+        then prog
+        else (
+          output_char stdout (char_of_int char1);
+          let char2 = bits c ~pos:8 ~width:8 in
+          if char2 = 0
+          then prog
+          else (
+            output_char stdout (char_of_int char1);
+            aux (i + 1) prog)))
+    in
+    let prog = aux 0 program in
+    flush stdout;
+    prog
+  ;;
+
   let exec_trap_halt (program : t) =
     { program with running = false; output_buffer = program.output_buffer ^ "\n\nHALT\n" }
+  ;;
+
+  let exec_trap_halt_unix (program : t) =
+    print_endline "HALT";
+    flush stdout;
+    { program with running = false }
   ;;
 
   let run_opcode (program : t) (op : OpCode.t) =
@@ -274,6 +342,36 @@ module Program = struct
        | Trap.TRAP_IN -> Ok (exec_trap_in prog)
        | Trap.TRAP_PUTSP -> Ok (exec_trap_putsp prog)
        | Trap.TRAP_HALT -> Ok (exec_trap_halt prog))
+  ;;
+
+  let run_opcode_unix (program : t) (op : OpCode.t) =
+    match op with
+    | OpCode.OP_RTI -> run_rti program
+    | OpCode.OP_RES -> run_res program
+    | OpCode.OP_ADD x -> Ok (run_add x program)
+    | OpCode.OP_AND x -> Ok (run_and x program)
+    | OpCode.OP_BR x -> Ok (run_br x program)
+    | OpCode.OP_LD x -> Ok (run_ld x program)
+    | OpCode.OP_ST x -> Ok (run_st x program)
+    | OpCode.OP_JSR x -> Ok (run_jsr x program)
+    | OpCode.OP_LDR x -> Ok (run_ldr x program)
+    | OpCode.OP_STR x -> Ok (run_str x program)
+    | OpCode.OP_NOT x -> Ok (run_not x program)
+    | OpCode.OP_LDI x -> Ok (run_ldi x program)
+    | OpCode.OP_STI x -> Ok (run_sti x program)
+    | OpCode.OP_JMP x -> Ok (run_jmp x program)
+    | OpCode.OP_LEA x -> Ok (run_lea x program)
+    | OpCode.OP_TRAP t ->
+      let prog =
+        { program with registers = Registers.set_r_r7 program.pc program.registers }
+      in
+      (match t with
+       | Trap.TRAP_GETC -> Ok (exec_trap_getc_unix prog)
+       | Trap.TRAP_OUT -> Ok (exec_trap_out_unix prog)
+       | Trap.TRAP_PUTS -> Ok (exec_trap_puts_unix prog)
+       | Trap.TRAP_IN -> Ok (exec_trap_in_unix prog)
+       | Trap.TRAP_PUTSP -> Ok (exec_trap_putsp_unix prog)
+       | Trap.TRAP_HALT -> Ok (exec_trap_halt_unix prog))
   ;;
 
   let should_continue ({ input_state; _ } : t) =
@@ -312,7 +410,9 @@ module Program = struct
         let pos = prog.pc in
         let prog = { prog with pc = pos + 1 } in
         let instr = Memory.read ~pos prog.memory in
-        let prog = OpCode.parse instr |> Result.map (run_opcode prog) |> Result.join in
+        let prog =
+          OpCode.parse instr |> Result.map (run_opcode_unix prog) |> Result.join
+        in
         match prog with
         | Ok prog -> aux prog
         | Error `Unused -> failwith "unused"
