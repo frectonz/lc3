@@ -309,6 +309,7 @@ module Program = struct
   ;;
 
   let exec_trap_halt_unix (program : t) =
+    print_newline ();
     print_endline "HALT";
     flush stdout;
     { program with running = false }
