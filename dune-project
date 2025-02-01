@@ -5,22 +5,17 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github frectonz/lc3))
 
-(authors "Author Name")
+(authors "frectonz")
 
-(maintainers "Maintainer Name")
+(maintainers "frectonz")
 
-(license LICENSE)
+(license MIT)
 
 (documentation https://url/to/documentation)
 
 (package
  (name lc3)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune notty nottui)
- (tags
-  (topics "to describe" your project)))
-
-; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
+ (synopsis "Observable LC3 Virtual Machine")
+ (depends ocaml dune notty nottui))
