@@ -243,14 +243,14 @@ module Program = struct
   ;;
 
   let exec_trap_halt (program : t) =
-    { program with running = false; output_buffer = program.output_buffer ^ "HALT" }
+    { program with running = false; output_buffer = program.output_buffer ^ "\n\nHALT\n" }
   ;;
 
-  let run_opcode (op : OpCode.t) (program : t) =
+  let run_opcode (program : t) (op : OpCode.t) =
     match op with
-    | OpCode.OP_ADD x -> Ok (run_add x program)
     | OpCode.OP_RTI -> run_rti program
     | OpCode.OP_RES -> run_res program
+    | OpCode.OP_ADD x -> Ok (run_add x program)
     | OpCode.OP_AND x -> Ok (run_and x program)
     | OpCode.OP_BR x -> Ok (run_br x program)
     | OpCode.OP_LD x -> Ok (run_ld x program)
@@ -292,19 +292,14 @@ module Program = struct
   ;;
 
   let step prog =
-    if not (should_continue prog)
-    then prog
-    else if not prog.running
+    if (not (should_continue prog)) || not prog.running
     then prog
     else (
       let pos = prog.pc in
       let prog = { prog with pc = pos + 1 } in
       let instr = Memory.read ~pos prog.memory in
       let prog =
-        OpCode.parse instr
-        |> Result.map (fun op -> run_opcode op prog)
-        |> Result.join
-        |> unwrap_prog
+        OpCode.parse instr |> Result.map (run_opcode prog) |> Result.join |> unwrap_prog
       in
       prog)
   ;;
@@ -317,9 +312,7 @@ module Program = struct
         let pos = prog.pc in
         let prog = { prog with pc = pos + 1 } in
         let instr = Memory.read ~pos prog.memory in
-        let prog =
-          OpCode.parse instr |> Result.map (fun op -> run_opcode op prog) |> Result.join
-        in
+        let prog = OpCode.parse instr |> Result.map (run_opcode prog) |> Result.join in
         match prog with
         | Ok prog -> aux prog
         | Error `Unused -> failwith "unused"

@@ -89,7 +89,7 @@ module OpCode = struct
 
   let parse_jsr instr =
     let long_flag = bits instr ~pos:11 ~width:1 in
-    if long_flag == 0
+    if long_flag = 0
     then
       let* r = bits instr ~pos:6 ~width:3 |> Registers.register_of_int in
       Ok (OP_JSR { sr = Register r })
