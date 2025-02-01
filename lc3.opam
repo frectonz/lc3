@@ -5,7 +5,6 @@ maintainer: ["frectonz"]
 authors: ["frectonz"]
 license: "MIT"
 homepage: "https://github.com/frectonz/lc3"
-doc: "https://url/to/documentation"
 bug-reports: "https://github.com/frectonz/lc3/issues"
 depends: [
   "ocaml"

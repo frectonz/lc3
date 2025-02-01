@@ -13,8 +13,6 @@
 
 (license MIT)
 
-(documentation https://url/to/documentation)
-
 (package
  (name lc3)
  (synopsis "Observable LC3 Virtual Machine")
