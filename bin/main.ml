@@ -1,5 +1,4 @@
 open Program
-open Array_ext
 
 (* let original_tio = Unix.tcgetattr Unix.stdin *)
 
@@ -53,10 +52,8 @@ let run_program path =
   | Error _ -> print_endline "failed to load image"
 ;;
 
-let run_programs paths = Array.iter run_program paths
-
 let () =
   if Array.length Sys.argv >= 2
-  then Sys.argv |> Array.remove_first |> run_programs
-  else print_endline "lc3 [image-file1] ..."
+  then run_program Sys.argv.(1)
+  else print_endline "lc3 [image-file]"
 ;;
