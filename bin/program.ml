@@ -393,33 +393,25 @@ module Program = struct
   let step prog =
     if (not (should_continue prog)) || not prog.running
     then prog
-    else (
-      let pos = prog.pc in
-      let prog = { prog with pc = pos + 1 } in
-      let instr = Memory.read ~pos prog.memory in
-      let prog =
-        OpCode.parse instr |> Result.map (run_opcode prog) |> Result.join |> unwrap_prog
-      in
-      prog)
+    else
+      Memory.read ~pos:prog.pc prog.memory
+      |> OpCode.parse
+      |> Result.map (run_opcode { prog with pc = prog.pc + 1 })
+      |> Result.join
+      |> unwrap_prog
   ;;
 
   let run (program : t) =
     let rec aux prog =
       if not prog.running
       then ()
-      else (
-        let pos = prog.pc in
-        let prog = { prog with pc = pos + 1 } in
-        let instr = Memory.read ~pos prog.memory in
-        let prog =
-          OpCode.parse instr |> Result.map (run_opcode_unix prog) |> Result.join
-        in
-        match prog with
-        | Ok prog -> aux prog
-        | Error `Unused -> failwith "unused"
-        | Error (`UnknownOp _) -> failwith "unknown op"
-        | Error (`UnknownTrap _) -> failwith "unkown trap"
-        | Error (`UnkownRegister _) -> failwith "unkown register")
+      else
+        Memory.read ~pos:prog.pc prog.memory
+        |> OpCode.parse
+        |> Result.map (run_opcode_unix { prog with pc = prog.pc + 1 })
+        |> Result.join
+        |> unwrap_prog
+        |> aux
     in
     aux program
   ;;

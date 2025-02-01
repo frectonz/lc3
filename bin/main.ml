@@ -41,14 +41,12 @@ let explore_program path =
     let module W = Nottui_widgets in
     let module A = Notty.A in
     let image = Lwd.var image in
-    let ui =
-      image
-      |> Lwd.get
-      |> Lwd.map ~f:Program.render
-      |> Lwd.join
-      |> Lwd.map ~f:(Ui.keyboard_area (action_handler image))
-    in
-    Ui_loop.run ui
+    image
+    |> Lwd.get
+    |> Lwd.map ~f:Program.render
+    |> Lwd.join
+    |> Lwd.map ~f:(Ui.keyboard_area (action_handler image))
+    |> Ui_loop.run
   | Error _ -> print_endline "failed to load image"
 ;;
 
