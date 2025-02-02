@@ -23,10 +23,12 @@ module Memory = struct
 
   let mr_kbsr = 0xFE00
   let mr_kbdr = 0xFE02
-  let check_key () = failwith "check_key"
-  (* match Unix.select [ Unix.stdin ] [] [] 0. with *)
-  (* | [], _, _ -> false *)
-  (* | _ :: _, _, _ -> true *)
+
+  let check_key () =
+    match Unix.select [ Unix.stdin ] [] [] 0. with
+    | [], _, _ -> false
+    | _ :: _, _, _ -> true
+  ;;
 
   let read ~pos memory =
     if pos = mr_kbsr
