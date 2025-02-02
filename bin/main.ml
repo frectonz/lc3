@@ -28,6 +28,11 @@ let action_handler app = function
   | `Arrow `Down, _ ->
     app |> Lwd.peek |> Program.step |> Lwd.set app;
     `Handled
+  | `Enter, _ ->
+    for _ = 1 to 1_000_000 do
+      app |> Lwd.peek |> Program.step |> Lwd.set app
+    done;
+    `Handled
   | `ASCII ch, _ ->
     app |> Lwd.peek |> Program.add_key ch |> Lwd.set app;
     `Handled
