@@ -17,6 +17,7 @@ module Program = struct
     ; running : bool
     ; output_buffer : string
     ; input_state : input_state
+    ; escape_sequence_state : int
     }
 
   let read image_path =
@@ -29,6 +30,7 @@ module Program = struct
       ; running = true
       ; output_buffer = ""
       ; input_state = NotAsked
+      ; escape_sequence_state = 0
       }
   ;;
 
@@ -177,8 +179,22 @@ module Program = struct
     { program with input_state = input_state' }
   ;;
 
-  let update_output_buffer ch ({ output_buffer; _ } as program : t) =
-    { program with output_buffer = output_buffer ^ String.make 1 ch }
+  let update_output_buffer ch (program : t) =
+    let new_state =
+      match program.escape_sequence_state with
+      | 0 -> if ch = '\x1B' then 1 else 0
+      | 1 -> if ch = '[' then 2 else 0
+      | 2 -> if ch = '2' then 3 else 0
+      | 3 -> if ch = 'J' then 4 else 0
+      | _ -> 0
+    in
+    if new_state = 4
+    then { program with output_buffer = ""; escape_sequence_state = 0 }
+    else
+      { program with
+        output_buffer = program.output_buffer ^ String.make 1 ch
+      ; escape_sequence_state = new_state
+      }
   ;;
 
   let exec_trap_getc (program : t) =
@@ -505,6 +521,7 @@ module Program = struct
   ;;
 
   let render_input_state (program : t) =
+    let open Nottui in
     let module W = Nottui_widgets in
     let module A = Notty.A in
     let input_state_str =
@@ -513,29 +530,35 @@ module Program = struct
       | InputingChar None -> "Input State: Inputting Character (waiting)"
       | InputingChar (Some c) -> Printf.sprintf "Input State: Inputting Character (%c)" c
     in
-    W.string ~attr:A.(fg white) input_state_str |> Lwd.return
+    let input_state = W.string ~attr:A.(fg white) input_state_str |> Lwd.return in
+    W.vbox [ Utils.header "INPUT STATE"; Ui.space 0 1 |> Lwd.return; input_state ]
+  ;;
+
+  let render_output_panel (program : t) =
+    let open Nottui in
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let strip_ansi str =
+      let re = Str.regexp "\027\\[[0-9;]*[mHJ]" in
+      Str.global_replace re "" str
+    in
+    W.vbox
+      (Utils.header "PROGRAM OUTPUT"
+       :: (Ui.space 0 1 |> Lwd.return)
+       :: (program.output_buffer
+           |> strip_ansi
+           |> String.split_on_char '\n'
+           |> List.map (fun line -> W.string line |> Lwd.return)))
   ;;
 
   let render (program : t) =
-    let open Nottui in
     let module W = Nottui_widgets in
     let module A = Notty.A in
     let registers = Registers.render program.registers in
     let special_registers = render_special_registers program in
     let ops = render_ops program in
-    let input_state_panel =
-      W.vbox
-        [ Utils.header "INPUT STATE"
-        ; Ui.space 0 1 |> Lwd.return
-        ; render_input_state program
-        ]
-    in
-    let output_panel =
-      W.vbox
-        (Utils.header "PROGRAM OUTPUT"
-         :: (Ui.space 0 1 |> Lwd.return)
-         :: List.map (fun line -> W.string line |> Lwd.return) [ program.output_buffer ])
-    in
+    let input_state_panel = render_input_state program in
+    let output_panel = render_output_panel program in
     W.h_pane
       output_panel
       (W.v_pane (W.v_pane registers special_registers) (W.v_pane ops input_state_panel))
