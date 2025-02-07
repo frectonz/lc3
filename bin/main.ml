@@ -40,7 +40,7 @@ let action_handler app = function
 ;;
 
 let explore_program path =
-  match Program.read path with
+  match Program.read path WithoutIoCheck with
   | Ok image ->
     let open Nottui in
     let module W = Nottui_widgets in
@@ -56,7 +56,7 @@ let explore_program path =
 ;;
 
 let run_program path =
-  match Program.read path with
+  match Program.read path WithIoCheck with
   | Ok image ->
     setup ();
     Program.run image

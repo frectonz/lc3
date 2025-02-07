@@ -20,8 +20,8 @@ module Program = struct
     ; escape_sequence_state : int
     }
 
-  let read image_path =
-    let* memory = Memory.read_image image_path in
+  let read image_path mem_typ =
+    let* memory = Memory.read_image image_path mem_typ in
     Ok
       { memory
       ; registers = Registers.make ()
@@ -488,8 +488,7 @@ module Program = struct
     let module W = Nottui_widgets in
     let module A = Notty.A in
     let pc = program.pc in
-    Array.sub program.memory pc n
-    |> Array.to_list
+    Memory.portion ~start:pc ~count:n program.memory
     |> List.mapi (fun i instr ->
       match OpCode.parse instr with
       | Ok op -> render_op (pc + i + 1) op

@@ -1,9 +1,13 @@
 module Memory = struct
-  type t = int array
+  type memory_type =
+    | WithIoCheck
+    | WithoutIoCheck
+
+  type t = int array * memory_type
 
   let empty () = Array.make Constants.memory_max 0
 
-  let read_image image_path =
+  let read_image (image_path : string) (mem_typ : memory_type) =
     let memory = empty () in
     In_channel.with_open_bin image_path (fun ic ->
       let buf = Bytes.create 2 in
@@ -18,7 +22,7 @@ module Memory = struct
           let n = Bytes.get_uint16_be buf (pos * 2) in
           memory.(origin + pos) <- n
         done;
-        Ok memory)
+        Ok (memory, mem_typ))
   ;;
 
   let mr_kbsr = 0xFE00
@@ -30,16 +34,23 @@ module Memory = struct
     | _ :: _, _, _ -> true
   ;;
 
-  let read ~pos memory =
-    if pos = mr_kbsr
-    then
-      if check_key ()
-      then (
-        memory.(mr_kbsr) <- 1 lsl 15;
-        memory.(mr_kbdr) <- input_char stdin |> int_of_char)
-      else memory.(mr_kbsr) <- 0;
-    memory.(pos)
+  let read ~pos ((memory, mem_typ) : t) =
+    match mem_typ with
+    | WithIoCheck ->
+      if pos = mr_kbsr
+      then
+        if check_key ()
+        then (
+          memory.(mr_kbsr) <- 1 lsl 15;
+          memory.(mr_kbdr) <- input_char stdin |> int_of_char)
+        else memory.(mr_kbsr) <- 0;
+      memory.(pos)
+    | WithoutIoCheck -> memory.(pos)
   ;;
 
-  let write ~pos ~value memory = memory.(pos) <- value
+  let portion ~start ~count ((memory, _) : t) =
+    Array.sub memory start count |> Array.to_list
+  ;;
+
+  let write ~pos ~value ((memory, _) : t) = memory.(pos) <- value
 end
