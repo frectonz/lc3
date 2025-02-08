@@ -25,9 +25,6 @@ module Memory = struct
         Ok (memory, mem_typ))
   ;;
 
-  let mr_kbsr = 0xFE00
-  let mr_kbdr = 0xFE02
-
   let check_key () =
     match Unix.select [ Unix.stdin ] [] [] 0. with
     | [], _, _ -> false
@@ -37,13 +34,13 @@ module Memory = struct
   let read ~pos ((memory, mem_typ) : t) =
     match mem_typ with
     | WithIoCheck ->
-      if pos = mr_kbsr
+      if pos = Constants.mr_kbsr
       then
         if check_key ()
         then (
-          memory.(mr_kbsr) <- 1 lsl 15;
-          memory.(mr_kbdr) <- input_char stdin |> int_of_char)
-        else memory.(mr_kbsr) <- 0;
+          memory.(Constants.mr_kbsr) <- 1 lsl 15;
+          memory.(Constants.mr_kbdr) <- input_char stdin |> int_of_char)
+        else memory.(Constants.mr_kbsr) <- 0;
       memory.(pos)
     | WithoutIoCheck -> memory.(pos)
   ;;
