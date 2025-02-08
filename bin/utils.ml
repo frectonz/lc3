@@ -4,6 +4,12 @@ let ( let* ) x f =
   | Error e -> Error e
 ;;
 
+let ( let@ ) x f =
+  match x with
+  | `Int v -> f v
+  | `Program p -> p
+;;
+
 let bits ?(pos = 0) ~width n =
   let mask = (1 lsl width) - 1 in
   (n lsr pos) land mask

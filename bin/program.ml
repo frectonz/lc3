@@ -46,6 +46,23 @@ module Program = struct
     { program with cond = fl }
   ;;
 
+  let read_memory ~pos (program : t) =
+    match snd program.memory with
+    | Memory.WithIoCheck -> `Int (Memory.read ~pos program.memory)
+    | Memory.WithoutIoCheck ->
+      if pos = Constants.mr_kbsr
+      then (
+        match program.input_state with
+        | NotAsked ->
+          `Program { program with input_state = InputingChar None; pc = program.pc - 1 }
+        | InputingChar (Some c) ->
+          Memory.write ~pos:Constants.mr_kbsr ~value:(1 lsl 15) program.memory;
+          Memory.write ~pos:Constants.mr_kbdr ~value:(int_of_char c) program.memory;
+          `Int (Memory.read ~pos program.memory)
+        | InputingChar None -> `Program program)
+      else `Int (Memory.read ~pos program.memory)
+  ;;
+
   let run_add ({ dr; sr1; sr2 } : OpCode.two_operators) ({ registers; _ } as program : t) =
     let sum =
       Registers.get sr1 registers
@@ -96,32 +113,29 @@ module Program = struct
 
   let run_ld
         ({ dr; pc_offset } : OpCode.load_register)
-        ({ pc; registers; memory; _ } as program : t)
+        ({ pc; registers; _ } as program : t)
     =
     let pos = pc +^ pc_offset in
-    let value = Memory.read ~pos memory in
+    let@ value = read_memory ~pos program in
     { program with registers = Registers.set ~index:dr ~value registers }
     |> update_flags dr
   ;;
 
   let run_ldi
         ({ dr; pc_offset } : OpCode.load_register)
-        ({ pc; registers; memory; _ } as program : t)
+        ({ pc; registers; _ } as program : t)
     =
     let pos = pc +^ pc_offset in
-    let value = Memory.read ~pos memory in
-    let value = Memory.read ~pos:value memory in
+    let@ value = read_memory ~pos program in
+    let@ value = read_memory ~pos:value program in
     { program with registers = Registers.set ~index:dr ~value registers }
     |> update_flags dr
   ;;
 
-  let run_ldr
-        ({ dr; sr; offset } : OpCode.op_ldr)
-        ({ registers; memory; _ } as program : t)
-    =
+  let run_ldr ({ dr; sr; offset } : OpCode.op_ldr) ({ registers; _ } as program : t) =
     let r = Registers.get sr registers in
     let pos = r +^ offset in
-    let value = Memory.read ~pos memory in
+    let@ value = read_memory ~pos program in
     { program with registers = Registers.set ~index:dr ~value registers }
     |> update_flags dr
   ;;
@@ -150,7 +164,7 @@ module Program = struct
         ({ pc; registers; memory; _ } as program : t)
     =
     let pos = pc +^ pc_offset in
-    let pos = Memory.read ~pos memory in
+    let@ pos = read_memory ~pos program in
     let value = Registers.get dr registers in
     Memory.write ~pos ~value memory;
     program
@@ -256,7 +270,7 @@ module Program = struct
 
   let exec_trap_puts (program : t) =
     let rec aux i prog =
-      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      let@ c = read_memory ~pos:(Registers.r_r0 prog.registers + i) prog in
       if c = 0 then prog else aux (i + 1) (update_output_buffer (char_of_int c) prog)
     in
     aux 0 program
@@ -264,7 +278,7 @@ module Program = struct
 
   let exec_trap_puts_unix (program : t) =
     let rec aux i prog =
-      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      let@ c = read_memory ~pos:(Registers.r_r0 prog.registers + i) prog in
       if c = 0
       then prog
       else (
@@ -278,7 +292,7 @@ module Program = struct
 
   let exec_trap_putsp (program : t) =
     let rec aux i prog =
-      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      let@ c = read_memory ~pos:(Registers.r_r0 prog.registers + i) prog in
       if c = 0
       then prog
       else (
@@ -299,7 +313,7 @@ module Program = struct
 
   let exec_trap_putsp_unix (program : t) =
     let rec aux i prog =
-      let c = Memory.read ~pos:(Registers.r_r0 prog.registers + i) prog.memory in
+      let@ c = read_memory ~pos:(Registers.r_r0 prog.registers + i) prog in
       if c = 0
       then prog
       else (
