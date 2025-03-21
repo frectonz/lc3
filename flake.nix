@@ -1,4 +1,3 @@
-
 {
   inputs = {
     opam-nix.url = "github:tweag/opam-nix";
@@ -28,7 +27,7 @@
           });
         };
 
-        scope' = scope.overrideScope' overlay;
+        scope' = scope.overrideScope overlay;
         main = scope'.${package};
         devPackages = builtins.attrValues
           (pkgs.lib.getAttrs (builtins.attrNames devPackagesQuery) scope');
