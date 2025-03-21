@@ -65,7 +65,11 @@ let run_program path =
 
 let disassemble_program path =
   match Program.read path WithIoCheck with
-  | Ok image -> Program.to_string image |> print_endline
+  | Ok image ->
+    let file = open_out "lc3.asm" in
+    output_string file (Program.to_string image);
+    close_out file;
+    print_endline "Assembly written to lc3.asm";
   | Error _ -> print_endline "failed to load image"
 ;;
 
