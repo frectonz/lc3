@@ -63,6 +63,12 @@ let run_program path =
   | Error _ -> print_endline "failed to load image"
 ;;
 
+let disassemble_program path =
+  match Program.read path WithIoCheck with
+  | Ok image -> Program.to_string image |> print_endline
+  | Error _ -> print_endline "failed to load image"
+;;
+
 let () =
   if Array.length Sys.argv >= 3
   then
@@ -70,6 +76,10 @@ let () =
     then explore_program Sys.argv.(2)
     else if Sys.argv.(1) = "run"
     then run_program Sys.argv.(2)
+    else if Sys.argv.(1) = "disassemble"
+    then disassemble_program Sys.argv.(2)
     else ()
-  else print_endline "lc3 explore [image-file]\nlc3 run [image-file]"
+  else
+    print_endline
+      "lc3 explore [image-file]\nlc3 run [image-file]\nlc3 disassemble [image-file]"
 ;;

@@ -34,6 +34,28 @@ module Program = struct
       }
   ;;
 
+  let unwrap_format mem acc pc prog =
+    match prog with
+    | Ok prog -> prog
+    | Error (`UnknownOp _) -> mem, acc ^ "unknown op\n", pc + 1
+    | Error (`UnknownTrap _) -> mem, acc ^ "unkown trap\n", pc + 1
+    | Error (`UnkownRegister _) -> mem, acc ^ "unkown register\n", pc + 1
+  ;;
+
+  let to_string ({ memory; _ } : t) =
+    let rec aux (mem, acc, pc) =
+      if pc + 1 == 65536
+      then mem, acc, pc
+      else
+        Memory.read ~pos:pc mem
+        |> OpCode.parse
+        |> Result.map (fun op -> mem, acc ^ OpCode.to_string op, pc + 1)
+        |> unwrap_format mem acc pc
+        |> aux
+    in
+    aux (memory, "", 0) |> fun (_, acc, _) -> acc
+  ;;
+
   let update_flags r ({ registers; _ } as program : t) =
     let v = Registers.get r registers in
     let fl =

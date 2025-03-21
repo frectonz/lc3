@@ -188,10 +188,8 @@ module OpCode = struct
     | Register r -> render_register r
   ;;
 
-  let render (op : t) =
-    let module W = Nottui_widgets in
-    let module A = Notty.A in
-    let op_str =
+  let to_string (op : t) =
+    let str =
       match op with
       | OP_ADD { dr; sr1; sr2 } ->
         Printf.sprintf
@@ -232,6 +230,13 @@ module OpCode = struct
         Printf.sprintf "LEA %s 0x%04x" (render_register dr) pc_offset
       | OP_TRAP trap -> Printf.sprintf "TRAP %s" (Trap.to_string trap)
     in
+    str ^ "\n"
+  ;;
+
+  let render (op : t) =
+    let module W = Nottui_widgets in
+    let module A = Notty.A in
+    let op_str = to_string op in
     W.string ~attr:A.(fg yellow) op_str |> Lwd.return
   ;;
 end
