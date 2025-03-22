@@ -46,12 +46,15 @@ module Program = struct
     let rec aux (mem, acc, pc) =
       if pc + 1 == 65536
       then mem, acc, pc
-      else
-        Memory.read ~pos:pc mem
-        |> OpCode.parse
-        |> Result.map (fun op -> mem, acc ^ OpCode.to_string op, pc + 1)
-        |> unwrap_format mem acc pc
-        |> aux
+      else (
+        let opcode = Memory.read ~pos:pc mem in
+        if opcode == 0
+        then aux (mem, acc, pc + 1)
+        else
+          OpCode.parse opcode
+          |> Result.map (fun op -> mem, acc ^ OpCode.to_string op, pc + 1)
+          |> unwrap_format mem acc pc
+          |> aux)
     in
     aux (memory, "", 0) |> fun (_, acc, _) -> acc
   ;;
